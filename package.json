@@ -2,6 +2,7 @@
   "name": "compilers-principles",
   "version": "0.1.0",
   "description": "A demo of compilers principles learning.",
+  "repository": "https://github.com/SardineFish/CompilersPrinciples.git",
   "main": "index.js",
   "scripts": {
     "build": "tsc",
