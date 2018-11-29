@@ -4,7 +4,10 @@
   "description": "A demo of compilers principles learning.",
   "main": "index.js",
   "scripts": {
-    "test": "mocha"
+    "build": "tsc",
+    "build:watch": "tsc -w",
+    "build:test": "tsc -p ./test.tsconfig.json",
+    "test": "node ./test/test.js"
   },
   "keywords": [
     "compilers-principles"
