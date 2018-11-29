@@ -5,9 +5,9 @@
   "repository": "https://github.com/SardineFish/CompilersPrinciples.git",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
-    "build:watch": "tsc -w",
-    "build:test": "tsc -p ./test.tsconfig.json",
+    "build": "npx tsc",
+    "build:watch": "npx tsc -w",
+    "build:test": "npx tsc -p ./test.tsconfig.json",
     "test": "node ./test/test.js"
   },
   "keywords": [
@@ -19,6 +19,8 @@
     "typescript": "^3.1.6"
   },
   "dependencies": {
-    "linq": "^3.1.1"
+    "@types/mocha": "^5.2.5",
+    "linq": "^3.1.1",
+    "mocha": "^5.2.0"
   }
 }
