@@ -1,0 +1,20 @@
+{
+  "name": "compilers-principles",
+  "version": "0.1.0",
+  "description": "A demo of compilers principles learning.",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "keywords": [
+    "compilers-principles"
+  ],
+  "author": "SardineFish",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^3.1.6"
+  },
+  "dependencies": {
+    "linq": "^3.1.1"
+  }
+}
