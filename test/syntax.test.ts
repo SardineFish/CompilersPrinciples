@@ -1,4 +1,4 @@
-import { SyntaxDef } from "../src/syntax-def";
+import { SyntaxDef, compileSyntax } from "../src/syntax-def";
 
 /*const syntax: Syntax = {
     "syntax": "<function-def>",
@@ -18,10 +18,14 @@ import { SyntaxDef } from "../src/syntax-def";
 
 const expressionSyntax: SyntaxDef = {
     "expr": "<plus> | <minus> | <term>",
-    "plus": "<expr> + <term>",
-    "minus": "<expr> - <term>",
-    "term": "<multi> | <divide> | <factor>",
-    "multi": "<term> * <factor>",
-    "divide": "<term> / <factor>",
+    "plus": "<expr> '+' <term>",
+    "minus": "<expr> '-' <term>",
+    "term": "<multi> '|' <divide> | <factor>",
+    "multi": "<term> '*' <factor>",
+    "divide": "<term> '/' <factor>",
     "factor": "'number' | 'id'",
 };
+let syntax = compileSyntax(expressionSyntax);
+var productions: any = {};
+Array.from(syntax.productions.keys()).map(key => productions[key] = syntax.productions.get(key));
+console.log(JSON.stringify(productions, null, 4));
