@@ -1,14 +1,16 @@
 import { LexPattern, Language, Lexer } from "./lexer";
+import linq from "linq";
+require("mocha");
 
 export interface SyntaxDef
 {
-    [key: string]: string;    
+    [key: string]: string;
 }
 export interface Terminal
 {
-    tokenName: string;
-    productionName: string;
-    empty: boolean;
+    tokenName?: string;
+    productionName?: string;
+    empty?: boolean;
 }
 export interface NonTerminal
 {
@@ -26,12 +28,13 @@ export class Syntax
     toString()
     {
         return Array.from(this.productions.values()).map(
-            p => `<${p.name}> ::= ${p.group.map(
-                nt => nt.sequence.map(
-                    t => t.empty ? "<>" :
-                        t.productionName ?
-                            `<${t.productionName}>` :
-                            `"${t.tokenName}"`
+            production => `<${production.name}> ::= ${production.group.map(
+                nonTerminal => nonTerminal.sequence.map(
+                    terminal => terminal.empty
+                        ? "<>"
+                        : terminal.productionName
+                            ? `<${terminal.productionName}>`
+                            : `"${terminal.tokenName}"`
                 ).join(" ")).join(" | ")}`).join("\r\n");
     }
 }
@@ -53,7 +56,7 @@ const syntaxDefLanguage: Language = {
     ]
 }
 
-export function compileSyntax(syntax: SyntaxDef):Syntax
+export function compileSyntax(syntax: SyntaxDef): Syntax
 {
     let output: Syntax = new Syntax();
     Object.keys(syntax).forEach(key =>
@@ -62,14 +65,14 @@ export function compileSyntax(syntax: SyntaxDef):Syntax
     });
     return output;
 }
-function compileProduction(name: string, text: string): Production
+export function compileProduction(name: string, text: string): Production
 {
     return {
         name: name,
         group: text.split("|").map(t => compileNonTerminal(t)),
     };
 }
-function compileNonTerminal(text: string): NonTerminal
+export function compileNonTerminal(text: string): NonTerminal
 {
     return {
         sequence: new Lexer(syntaxDefLanguage).parse(text).map(token =>
@@ -90,14 +93,82 @@ function compileNonTerminal(text: string): NonTerminal
             return output;
         })
     };
-    
-}
 
-function preventLeftRecursive(syntax: Syntax)
+}
+export function compressProduction(p1: Production, p2: Production): Production
 {
-    var productions = Array.from(syntax.productions.values());
+    let group: NonTerminal[] = [];
+    p1.group.forEach(
+        nt1 =>
+        {
+            if (nt1.sequence[0].productionName === p2.name)
+            {
+                group = group.concat(p2.group.map(nt2 => <NonTerminal>{
+                    sequence: nt2.sequence.concat(linq.from(nt1.sequence).skip(1).toArray())
+                }))
+            }
+            else
+                group.push(nt1);
+        });
+    return {
+        group: group,
+        name: p1.name
+    };
+}
+export function preventLeftRecursive(syntax: Syntax)
+{
+    let productions = Array.from(syntax.productions.values());
     for (let i = 0; i < productions.length; i++)
     {
-
+        for (let j = 0; j < i; j++)
+        {
+            let group: NonTerminal[] = [];
+            productions[i].group.forEach(
+                ntI =>
+                {
+                    if (ntI.sequence[0].productionName === productions[j].name)
+                    {
+                        group = group.concat(productions[j].group.map(ntJ => <NonTerminal>{
+                            sequence: ntJ.sequence.concat(linq.from(ntI.sequence).take(1).toArray())
+                        }))
+                    }
+                    else
+                        group.push(ntI);
+                });
+            
+        }
     }
+}
+export function preventInstantLeftRecursive(syntax: Syntax, production: Production): [Production, Production]
+{
+    let leftRecursiveGroup = production.group.filter(nonTerminal => nonTerminal.sequence[0].productionName === production.name);
+    let nonLeftRecursiveGroup = production.group.filter(nonTerminal => nonTerminal.sequence[0].productionName !== production.name);
+    if (leftRecursiveGroup.length > 0)
+    {
+        let id = 1;
+        while (syntax.productions.has(`${production.name}-${id}`))
+            id++;
+        let subName = `${production.name}-${id}`;
+        let subProduction: Production = {
+            name: subName,
+            group: leftRecursiveGroup.map(
+                nt => <NonTerminal>{
+                    sequence: linq
+                        .from(nt.sequence)
+                        .skip(1)
+                        .toArray().concat(<Terminal>{ productionName: subName })
+                }).concat(<NonTerminal>{
+                    sequence: [<Terminal>{ empty: true }]
+                })
+        };
+        nonLeftRecursiveGroup = nonLeftRecursiveGroup.map(
+            nt => <NonTerminal>{
+                sequence: nt.sequence.concat(
+                    <Terminal>{ productionName: subName })
+            });
+        syntax.productions.set(subName, subProduction);
+        production.group = nonLeftRecursiveGroup;
+        return [production, subProduction];
+    }
+    return [production, null];
 }
