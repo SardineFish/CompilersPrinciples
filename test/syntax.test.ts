@@ -17,10 +17,12 @@ import { SyntaxDef, compileSyntax } from "../src/syntax-def";
 };*/
 
 const expressionSyntax: SyntaxDef = {
+    "syntax": "<statement> | <syntax> | <>",
+    "statement": "<expr> ';'",
     "expr": "<plus> | <minus> | <term>",
     "plus": "<expr> '+' <term>",
     "minus": "<expr> '-' <term>",
-    "term": "<multi> '|' <divide> | <factor>",
+    "term": "<multi> | <divide> | <factor>",
     "multi": "<term> '*' <factor>",
     "divide": "<term> '/' <factor>",
     "factor": "'number' | 'id'",
@@ -28,4 +30,5 @@ const expressionSyntax: SyntaxDef = {
 let syntax = compileSyntax(expressionSyntax);
 var productions: any = {};
 Array.from(syntax.productions.keys()).map(key => productions[key] = syntax.productions.get(key));
-console.log(JSON.stringify(productions, null, 4));
+//console.log(JSON.stringify(productions, null, 4));
+console.log(syntax.toString());

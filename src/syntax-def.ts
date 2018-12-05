@@ -19,9 +19,21 @@ export interface Production
     name: string;
     group: NonTerminal[];
 }
-export interface Syntax
+export class Syntax
 {
-    productions: Map<string, Production>;
+    productions: Map<string, Production> = new Map();
+
+    toString()
+    {
+        return Array.from(this.productions.values()).map(
+            p => `<${p.name}> ::= ${p.group.map(
+                nt => nt.sequence.map(
+                    t => t.empty ? "<>" :
+                        t.productionName ?
+                            `<${t.productionName}>` :
+                            `"${t.tokenName}"`
+                ).join(" ")).join(" | ")}`).join("\r\n");
+    }
 }
 
 const syntaxDefLanguage: Language = {
@@ -43,9 +55,7 @@ const syntaxDefLanguage: Language = {
 
 export function compileSyntax(syntax: SyntaxDef):Syntax
 {
-    let output: Syntax = {
-        productions: new Map()
-    };
+    let output: Syntax = new Syntax();
     Object.keys(syntax).forEach(key =>
     {
         output.productions.set(key, compileProduction(key, syntax[key]));
@@ -82,12 +92,12 @@ function compileNonTerminal(text: string): NonTerminal
     };
     
 }
-/*
-function preventLeftRecursive(syntax: SyntaxDef)
+
+function preventLeftRecursive(syntax: Syntax)
 {
-    var terms = Object.keys(syntax);
-    for (var i = 0; i < terms.length; i++)
+    var productions = Array.from(syntax.productions.values());
+    for (let i = 0; i < productions.length; i++)
     {
-        for (var j = 0;j<terms.length )    
+
     }
-}*/
+}
