@@ -1,5 +1,4 @@
-import { compileSyntax, SyntaxDef, preventLeftRecursive, NonTerminalUnit, Terminal, terminalStringify } from "../src/syntax-def";
-import { first, follow } from "../src/syntax-analyser";
+import { compileSyntax, SyntaxDef, preventLeftRecursive, NonTerminalUnit, Terminal, terminalStringify, first, follow } from "../src/syntax-def";
 import assert from "assert";
 import { expect } from "chai";
 

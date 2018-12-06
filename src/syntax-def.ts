@@ -218,3 +218,54 @@ export function preventInstantLeftRecursive(syntax: Syntax, production: Producti
     }
     return [production, null];
 }
+
+export function first(sequence: TerminalUnit[], syntax: Syntax): TerminalUnit[]
+{
+    return sequence[0].empty
+        ? [sequence[0]]
+        : sequence[0].productionName
+            ? <TerminalUnit[]>[].concat(...syntax.productions.get(sequence[0].productionName).group.map(nt => first(nt.sequence, syntax)))
+            : [sequence[0]];
+}
+
+export function follow(unit: TerminalUnit, syntax: Syntax): TerminalUnit[]
+{
+    return linq.from(followInternal(unit, syntax, new Map())).distinct(terminalStringify).toArray();
+}
+
+function followInternal(unit: TerminalUnit, syntax: Syntax, visited: Map<string, true>)
+{
+    let output: TerminalUnit[] = [];
+    if (visited.get(terminalStringify(unit)))
+        return [];
+    visited.set(terminalStringify(unit), true);
+
+    if ((unit as NonTerminalUnit).productionName === syntax.entry)
+    {
+        output.push(new EOFTerminal());
+    }
+    syntax.productions.forEach((production, name) =>
+    {
+        production.group.forEach(nt =>
+        {
+            for (let i = 0; i < nt.sequence.length; i++)
+            {
+                if (terminalEqual(nt.sequence[i], unit))
+                {
+                    // Exist <name> ::= <...any> <unit>
+                    if (i + 1 >= nt.sequence.length)
+                        output = output.concat(...followInternal(new NonTerminalUnit(name), syntax, visited));
+                    else
+                    {
+                        // Exist <name> ::= <...any> <unit> <f> with empty terminal in first(f)
+                        if (first([nt.sequence[i + 1]], syntax).some(t => t.empty))
+                            output = output.concat(...followInternal(new NonTerminalUnit(name), syntax, visited));
+
+                        output = output.concat(...first([nt.sequence[i + 1]], syntax).filter(t => !t.empty));
+                    }
+                }
+            }
+        })
+    });
+    return output;
+}
