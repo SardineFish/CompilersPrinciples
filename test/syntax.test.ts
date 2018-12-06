@@ -46,7 +46,9 @@ describe("Testing syntax defination", () =>
             '<multi> ::= <term> "*" <factor>',
             '<divide> ::= <term> "/" <factor>',
             '<factor> ::= "number" | "id"',].join("\r\n");
-        assert.strictEqual(syntax.toString(), expect)
+        assert.strictEqual(syntax.toString(), expect);
+        /*preventLeftRecursive(syntax);
+        console.log(syntax.toString());*/
     });
     it("Prevent instant left recursive", () =>
     {
@@ -90,6 +92,25 @@ describe("Testing syntax defination", () =>
             "A-1": "<c><A-1>|<a><d><A-1>|<>"
         });
         //console.log(syntax.toString());
+        assert.deepStrictEqual(syntax, expect);
+    });
+    it("Expression syntax test", () =>
+    {
+        const syntaxDef: SyntaxDef = {
+            "expr": "<expr> '+' <term> | <expr> '-' <term> | <term>",
+            "term": "<term> '*' <factor> | <term> '/' <factor> | <factor>",
+            "factor": "'number' | 'id' | '(' <expr> ')'"
+        };
+        const syntax = compileSyntax(syntaxDef);
+        preventLeftRecursive(syntax);
+        //console.log(syntax.toString());
+        const expect = compileSyntax({
+            "expr": "<term><expr-1>",
+            "term": "<factor><term-1>",
+            "factor": "'number'|'id'|'('<expr>')'",
+            "expr-1": "'+'<term><expr-1>|'-'<term><expr-1>|<>",
+            "term-1": "'*'<factor><term-1>|'/'<factor><term-1>|<>",
+        });
         assert.deepStrictEqual(syntax, expect);
     });
 });
