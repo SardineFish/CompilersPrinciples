@@ -1,6 +1,8 @@
-import { compileSyntax, SyntaxDef, preventLeftRecursive, NonTerminalUnit, Terminal, terminalStringify, first, follow, generatePredictionMap } from "../src/syntax-def";
+import { compileSyntax, SyntaxDef, preventLeftRecursive, NonTerminalUnit, Terminal, terminalStringify} from "../src/syntax-def";
 import assert from "assert";
 import { expect } from "chai";
+import { first, follow, generatePredictionMap } from "../src/syntax-analyser";
+import { Language } from "../src/lexer";
 
 describe("Testing syntax analyser", () =>
 {
@@ -72,5 +74,22 @@ describe("Testing syntax analyser", () =>
         expect(() => generatePredictionMap(syntax)).throw(Error, "Ambiguous syntax");
     });
 
-    //it("LL(1)")
+    it("Syntax analyse top-down", () =>
+    {
+        const language: Language = {
+            comment: /(\/\/.*[\r]?[\n]?)|((?:\/\*(?!\/)(?:.|\s)*?\*\/))/,
+            whiteSpace: /\s+/,
+            patterns: [
+                
+            ]
+        }
+        const syntaxDef: SyntaxDef = {
+            "expr": "<expr> '+' <term> | <expr> '-' <term> | <term>",
+            "term": "<term> '*' <factor> | <term> '/' <factor> | <factor>",
+            "factor": "'number' | 'id' | '(' <expr> ')'"
+        };
+        const syntax = compileSyntax(syntaxDef);
+        preventLeftRecursive(syntax);
+        
+    });
 });
