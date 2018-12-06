@@ -6,4 +6,6 @@ jobs:
     - stage: build
       script: npm run build
     - stage: test
-      script: npm test
+      script: 
+        - npm run build
+        - npm test
