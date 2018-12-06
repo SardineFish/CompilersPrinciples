@@ -300,7 +300,7 @@ class PredictionMap
         const [production, terminal] = key;
         const keyM = `<${production}> "${terminal}"`;
         if (this.map.has(keyM) && !equalSpecificProduction(this.map.get(keyM), value))
-            throw new Error("Value already set.");
+            throw new Error("Ambiguous syntax");
         this.map.set(keyM, value);
         if (!this.productions.includes(production))
             this.productions.push(production);

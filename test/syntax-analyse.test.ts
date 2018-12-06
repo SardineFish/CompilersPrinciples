@@ -55,7 +55,22 @@ describe("Testing syntax analyser", () =>
         };
         const syntax = compileSyntax(syntaxDef);
         preventLeftRecursive(syntax);
-        expect(()=>generatePredictionMap(syntax)).not.throw();
+        expect(() => generatePredictionMap(syntax)).not.throw();
         //console.log(generatePredictionMap(syntax).toString(30));
-    })
+    });
+
+    it("Ambiguous syntax", () =>
+    {
+        const syntaxDef: SyntaxDef = {
+            "statement": "'if' <expr> 'then' <statement> <statement-1> | 'other'",
+            "statement-1": "'else' <statement> | <>",
+            "expr": "'expr'"
+        };
+        const syntax = compileSyntax(syntaxDef);
+        //preventLeftRecursive(syntax);
+        //console.log(syntax.toString());
+        expect(() => generatePredictionMap(syntax)).throw(Error, "Ambiguous syntax");
+    });
+
+    //it("LL(1)")
 });
