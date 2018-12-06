@@ -40,7 +40,7 @@ export class Lexer
     }
 }
 
-function lexAnalysis(language: Language, input: string)
+function lexAnalysis(language: Language, input: string):LexToken[]
 {
     const outputTokens: LexToken[] = [];
 
@@ -91,4 +91,41 @@ function lexAnalysis(language: Language, input: string)
 function matchIgnore(language: Language, input: string)
 {
 
+}
+export class TokenReader
+{
+    tokens: LexToken[];
+    currentIdx: number = -1;
+    constructor(tokens: LexToken[])
+    {
+        this.tokens = tokens;
+    }
+    get current():LexToken
+    {
+        if (this.currentIdx > 0 || this.currentIdx >= this.tokens.length)
+            return null;
+        return this.tokens[this.currentIdx];
+    }
+    get next(): LexToken
+    {
+        this.currentIdx++;
+        return this.current;
+    }
+    take(): LexToken
+    {
+        const token = this.current;
+        this.currentIdx++;
+        return token;
+    }
+    moveTo(idx: number)
+    {
+        this.currentIdx = idx;
+        return this.current;
+    }
+}
+
+export function* tokenGenerator(tokens:LexToken[])
+{
+    for (var i = 0; i < tokens.length; i++)
+        yield tokens[i];
 }

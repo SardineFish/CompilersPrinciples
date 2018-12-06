@@ -6,15 +6,40 @@ export interface SyntaxDef
 {
     [key: string]: string;
 }
-export interface Terminal
+export interface TerminalUnit
 {
     tokenName?: string;
     productionName?: string;
     empty?: boolean;
+    eof?: boolean;
+}
+export class EmptyTerminal implements TerminalUnit
+{
+    empty: true = true;
+}
+export class EOFTerminal implements TerminalUnit
+{
+    eof: true = true;
+}
+export class Terminal implements TerminalUnit
+{
+    tokenName: string;
+    constructor(name: string)
+    {
+        this.tokenName = name;
+    }
+}
+export class NonTerminalUnit implements TerminalUnit
+{
+    productionName: string;
+    constructor(name: string)
+    {
+        this.productionName = name;
+    }
 }
 export interface NonTerminal
 {
-    sequence: Terminal[];
+    sequence: TerminalUnit[];
 }
 export interface Production
 {
@@ -23,6 +48,7 @@ export interface Production
 }
 export class Syntax
 {
+    entry: string;
     productions: Map<string, Production> = new Map();
 
     toString()
@@ -56,13 +82,14 @@ const syntaxDefLanguage: Language = {
     ]
 }
 
-export function compileSyntax(syntax: SyntaxDef): Syntax
+export function compileSyntax(syntax: SyntaxDef, entry?: string): Syntax
 {
     let output: Syntax = new Syntax();
     Object.keys(syntax).forEach(key =>
     {
         output.productions.set(key, compileProduction(key, syntax[key]));
     });
+    output.entry = entry ? entry : Object.keys(syntax)[0];
     return output;
 }
 export function compileProduction(name: string, text: string): Production
@@ -77,7 +104,7 @@ export function compileNonTerminal(text: string): NonTerminal
     return {
         sequence: new Lexer(syntaxDefLanguage).parse(text).map(token =>
         {
-            let output: Terminal = {
+            let output: TerminalUnit = {
             };
             if (token.name === "production")
             {
@@ -93,7 +120,7 @@ export function compileNonTerminal(text: string): NonTerminal
     };
 
 }
-function terminalEqual(t1: Terminal, t2: Terminal)
+export function terminalEqual(t1: TerminalUnit, t2: TerminalUnit)
 {
     return t1.empty
         ? t1.empty === t2.empty
@@ -101,22 +128,24 @@ function terminalEqual(t1: Terminal, t2: Terminal)
             ? t1.productionName === t2.productionName
             : t1.tokenName === t2.tokenName;
 }
-function terminalComparer(t: Terminal)
+export function terminalStringify(t: TerminalUnit)
 {
-    return t.empty
+    return t.eof
+        ? '"$"'
+        : t.empty
         ? "<>"
         : t.productionName
             ? `<${t.productionName}>`
             : `"${t.tokenName}"`;
 }
-export function concatTerminals(...sequences: Terminal[][])
+export function concatTerminals(...sequences: TerminalUnit[][])
 {
-    let total: Terminal[] = [].concat(...sequences);
+    let total: TerminalUnit[] = [].concat(...sequences);
     if (total.length > 1)
     {
         return linq.from(total)
             .where(t => !t.empty)
-            .distinct(terminalComparer)
+            .distinct(terminalStringify)
             .toArray();
     }
     return total;
@@ -173,15 +202,15 @@ export function preventInstantLeftRecursive(syntax: Syntax, production: Producti
                     sequence: concatTerminals(linq
                         .from(nt.sequence)
                         .skip(1)
-                        .toArray(), [<Terminal>{ productionName: subName }])
+                        .toArray(), [<TerminalUnit>{ productionName: subName }])
                 }).concat(<NonTerminal>{
-                    sequence: [<Terminal>{ empty: true }]
+                    sequence: [<TerminalUnit>{ empty: true }]
                 })
         };
         nonLeftRecursiveGroup = nonLeftRecursiveGroup.map(
             nt => <NonTerminal>{
                 sequence: concatTerminals(nt.sequence,
-                    [<Terminal>{ productionName: subName }])
+                    [<TerminalUnit>{ productionName: subName }])
             });
         syntax.productions.set(subName, subProduction);
         production.group = nonLeftRecursiveGroup;
