@@ -78,15 +78,13 @@ export function compileNonTerminal(text: string): NonTerminal
         sequence: new Lexer(syntaxDefLanguage).parse(text).map(token =>
         {
             let output: Terminal = {
-                empty: false,
-                productionName: null,
-                tokenName: null
             };
             if (token.name === "production")
             {
                 if (token.attribute === "")
                     output.empty = true;
-                output.productionName = token.attribute;
+                else
+                    output.productionName = token.attribute;
             }
             else if (token.name === "token")
                 output.tokenName = token.attribute;
@@ -94,6 +92,34 @@ export function compileNonTerminal(text: string): NonTerminal
         })
     };
 
+}
+function terminalEqual(t1: Terminal, t2: Terminal)
+{
+    return t1.empty
+        ? t1.empty === t2.empty
+        : t1.productionName
+            ? t1.productionName === t2.productionName
+            : t1.tokenName === t2.tokenName;
+}
+function terminalComparer(t: Terminal)
+{
+    return t.empty
+        ? "<>"
+        : t.productionName
+            ? `<${t.productionName}>`
+            : `"${t.tokenName}"`;
+}
+export function concatTerminals(...sequences: Terminal[][])
+{
+    let total: Terminal[] = [].concat(...sequences);
+    if (total.length > 1)
+    {
+        return linq.from(total)
+            .where(t => !t.empty)
+            .distinct(terminalComparer)
+            .toArray();
+    }
+    return total;
 }
 export function compressProduction(p1: Production, p2: Production): Production
 {
@@ -104,7 +130,7 @@ export function compressProduction(p1: Production, p2: Production): Production
             if (nt1.sequence[0].productionName === p2.name)
             {
                 group = group.concat(p2.group.map(nt2 => <NonTerminal>{
-                    sequence: nt2.sequence.concat(linq.from(nt1.sequence).skip(1).toArray())
+                    sequence: concatTerminals(nt2.sequence,linq.from(nt1.sequence).skip(1).toArray())
                 }))
             }
             else
@@ -122,21 +148,12 @@ export function preventLeftRecursive(syntax: Syntax)
     {
         for (let j = 0; j < i; j++)
         {
-            let group: NonTerminal[] = [];
-            productions[i].group.forEach(
-                ntI =>
-                {
-                    if (ntI.sequence[0].productionName === productions[j].name)
-                    {
-                        group = group.concat(productions[j].group.map(ntJ => <NonTerminal>{
-                            sequence: ntJ.sequence.concat(linq.from(ntI.sequence).take(1).toArray())
-                        }))
-                    }
-                    else
-                        group.push(ntI);
-                });
-            
+            productions[i].group = compressProduction(productions[i], productions[j]).group;
         }
+        let [production, subProduction] = preventInstantLeftRecursive(syntax, productions[i]);
+        productions[i] = production;
+        if (subProduction)
+            productions.push(subProduction);
     }
 }
 export function preventInstantLeftRecursive(syntax: Syntax, production: Production): [Production, Production]
@@ -153,18 +170,18 @@ export function preventInstantLeftRecursive(syntax: Syntax, production: Producti
             name: subName,
             group: leftRecursiveGroup.map(
                 nt => <NonTerminal>{
-                    sequence: linq
+                    sequence: concatTerminals(linq
                         .from(nt.sequence)
                         .skip(1)
-                        .toArray().concat(<Terminal>{ productionName: subName })
+                        .toArray(), [<Terminal>{ productionName: subName }])
                 }).concat(<NonTerminal>{
                     sequence: [<Terminal>{ empty: true }]
                 })
         };
         nonLeftRecursiveGroup = nonLeftRecursiveGroup.map(
             nt => <NonTerminal>{
-                sequence: nt.sequence.concat(
-                    <Terminal>{ productionName: subName })
+                sequence: concatTerminals(nt.sequence,
+                    [<Terminal>{ productionName: subName }])
             });
         syntax.productions.set(subName, subProduction);
         production.group = nonLeftRecursiveGroup;

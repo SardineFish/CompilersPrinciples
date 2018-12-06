@@ -1,4 +1,4 @@
-import { SyntaxDef, compileSyntax, preventInstantLeftRecursive, compressProduction } from "../src/syntax-def";
+import { SyntaxDef, compileSyntax, preventInstantLeftRecursive, compressProduction, preventLeftRecursive } from "../src/syntax-def";
 import assert from "assert";
 /*const syntax: Syntax = {
     "syntax": "<function-def>",
@@ -75,5 +75,21 @@ describe("Testing syntax defination", () =>
         ].join("\r\n");
         //console.log(syntax.toString());
         assert.strictEqual(syntax.toString(), expect);
+    });
+    it("Prevent left recursive", () =>
+    {
+        const syntaxDef: SyntaxDef = {
+            "S": "<A> <a> | <b>",
+            "A": "<A> <c> | <S> <d> | <>"
+        };
+        const syntax = compileSyntax(syntaxDef);
+        preventLeftRecursive(syntax);
+        const expect = compileSyntax({
+            "S": "<A><a>|<b>",
+            "A": "<b><d><A-1>|<A-1>",
+            "A-1": "<c><A-1>|<a><d><A-1>|<>"
+        });
+        //console.log(syntax.toString());
+        assert.deepStrictEqual(syntax, expect);
     });
 });
