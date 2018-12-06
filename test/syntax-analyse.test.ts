@@ -1,4 +1,4 @@
-import { compileSyntax, SyntaxDef, preventLeftRecursive, NonTerminalUnit, Terminal, terminalStringify, first, follow } from "../src/syntax-def";
+import { compileSyntax, SyntaxDef, preventLeftRecursive, NonTerminalUnit, Terminal, terminalStringify, first, follow, generatePredictionMap } from "../src/syntax-def";
 import assert from "assert";
 import { expect } from "chai";
 
@@ -55,6 +55,7 @@ describe("Testing syntax analyser", () =>
         };
         const syntax = compileSyntax(syntaxDef);
         preventLeftRecursive(syntax);
-        console.log(syntax.toString());
+        expect(()=>generatePredictionMap(syntax)).not.throw();
+        //console.log(generatePredictionMap(syntax).toString(30));
     })
 });

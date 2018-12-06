@@ -1,5 +1,5 @@
 import { LexPattern, Language, Lexer } from "./lexer";
-import linq from "linq";
+import linq, { from } from "linq";
 require("mocha");
 
 export interface SyntaxDef
@@ -268,4 +268,83 @@ function followInternal(unit: TerminalUnit, syntax: Syntax, visited: Map<string,
         })
     });
     return output;
+}
+interface SpecificProduction
+{
+    name: string;
+    sequence: TerminalUnit[];
+}
+function equalSpecificProduction(p1: SpecificProduction, p2: SpecificProduction)
+{
+    return p1.name === p2.name
+        && p1.sequence.length === p2.sequence.length
+        && p1.sequence.every((t, idx) => terminalStringify(t) === terminalStringify(p2.sequence[idx]));
+}
+function stringifySpecificProduction(p: SpecificProduction)
+{
+    if (!p)
+        return "";
+    return `${p.name} ::= ${p.sequence.map(t => terminalStringify(t)).join(" ")}`;
+}
+function fixSpace(text: string, space: number)
+{
+    return `${text}${linq.repeat(" ", space - text.length).toArray().join("")}`;
+}
+class PredictionMap
+{
+    map: Map<string, SpecificProduction> = new Map();
+    productions: string[] = [];
+    terminals: string[] = [];
+    set(key: [string, string], value: SpecificProduction)
+    {
+        const [production, terminal] = key;
+        const keyM = `<${production}> "${terminal}"`;
+        if (this.map.has(keyM) && !equalSpecificProduction(this.map.get(keyM), value))
+            throw new Error("Value already set.");
+        this.map.set(keyM, value);
+        if (!this.productions.includes(production))
+            this.productions.push(production);
+        if (!this.terminals.includes(terminal))
+            this.terminals.push(terminal);
+        return this;
+    }
+    get(key: [string, string]): SpecificProduction
+    {
+        const [production, terminal] = key;
+        const keyM = `<${production}> "${terminal}"`;
+        return this.map.get(keyM);
+    }
+    toString(space: number = 4)
+    {
+        space = space || 1;
+        return `${fixSpace("", space)}${this.terminals.map(t=>fixSpace(`"${t}"`,space)).join("")} \r\n${this.productions.map(
+            production => `${fixSpace(`<${production}>`, space)}${this.terminals.map(
+                t => fixSpace(stringifySpecificProduction(this.get([production, t])), space)
+            ).join("")}`).join("\r\n")}`;
+    }
+}
+export function generatePredictionMap(syntax: Syntax): PredictionMap
+{
+    const map: PredictionMap = new PredictionMap();
+    syntax.productions.forEach((production, name) =>
+    {
+        production.group.forEach(
+            nt =>
+            {
+                const headers = first(nt.sequence, syntax);
+                headers.filter(t => !t.empty).forEach(t => map.set([name, t.tokenName], {
+                    name: name,
+                    sequence: nt.sequence
+                }));
+                if (headers.some(t => t.empty))
+                {
+                    follow(new NonTerminalUnit(name), syntax).forEach(t => map.set([name, t.eof ? "$" : t.tokenName], {
+                        name: name,
+                        sequence: nt.sequence
+                    }));
+                }
+            }
+        ) 
+    });
+    return map;
 }
