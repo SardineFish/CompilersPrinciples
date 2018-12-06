@@ -96,6 +96,7 @@ function first(token: LexToken, production: Production, syntax:Syntax):NonTermin
         .toArray();
 }*/
 
+/*
 export function first(unit: TerminalUnit, syntax: Syntax): TerminalUnit[]
 export function first(production: Production, syntax: Syntax): TerminalUnit[]
 export function first(unit: Production | TerminalUnit, syntax: Syntax): TerminalUnit[]
@@ -113,6 +114,14 @@ export function first(unit: Production | TerminalUnit, syntax: Syntax): Terminal
         return first(syntax.productions.get((unit as NonTerminalUnit).productionName), syntax);
     else if ((unit as Terminal).tokenName)
         return [(unit as Terminal)];
+}*/
+export function first(sequence: TerminalUnit[], syntax: Syntax): TerminalUnit[]
+{
+    return sequence[0].empty
+        ? [sequence[0]]
+        : sequence[0].productionName
+            ? <TerminalUnit[]>[].concat(...syntax.productions.get(sequence[0].productionName).group.map(nt => first(nt.sequence, syntax)))
+            : [sequence[0]];
 }
 
 export function follow(unit: TerminalUnit, syntax: Syntax): TerminalUnit[]
@@ -145,10 +154,10 @@ function followInternal(unit: TerminalUnit, syntax: Syntax, visited: Map<string,
                     else
                     {
                         // Exist <name> ::= <...any> <unit> <f> with empty terminal in first(f)
-                        if (first(nt.sequence[i + 1], syntax).some(t => t.empty))
+                        if (first([nt.sequence[i + 1]], syntax).some(t => t.empty))
                             output = output.concat(...followInternal(new NonTerminalUnit(name), syntax,visited));
 
-                        output = output.concat(...first(nt.sequence[i + 1], syntax).filter(t => !t.empty));
+                        output = output.concat(...first([nt.sequence[i + 1]], syntax).filter(t => !t.empty));
                     }
                 }
             }

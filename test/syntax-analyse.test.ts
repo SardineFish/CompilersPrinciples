@@ -14,7 +14,7 @@ describe("Testing syntax analyser", () =>
         };
         const syntax = compileSyntax(syntaxDef);
         preventLeftRecursive(syntax); 
-        const result = first(syntax.productions.get("expr"), syntax);
+        const result = first(syntax.productions.get("expr").group[0].sequence, syntax);
         const expect = [
             { tokenName: "number" },
             { tokenName: "id" },
@@ -46,4 +46,16 @@ describe("Testing syntax analyser", () =>
             .but.not.have.members(['"$"', '"+"', '"-"', '"*"', '"/"', '")"']);
         //console.log(follow(new Terminal("number"), syntax));
     });
+
+    it("Prediction table test", () =>
+    {
+        const syntaxDef: SyntaxDef = {
+            "expr": "<expr> '+' <term> | <term>",
+            "term": "<term> '*' <factor> | <factor>",
+            "factor": "'number' | 'id' | '(' <expr> ')'"
+        };
+        const syntax = compileSyntax(syntaxDef);
+        preventLeftRecursive(syntax);
+        console.log(syntax.toString());
+    })
 });
