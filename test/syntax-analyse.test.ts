@@ -1,8 +1,8 @@
 import { compileSyntax, SyntaxDef, preventLeftRecursive, NonTerminalUnit, Terminal, terminalStringify} from "../src/syntax-def";
 import assert from "assert";
 import { expect } from "chai";
-import { first, follow, generatePredictionMap } from "../src/syntax-analyser";
-import { Language } from "../src/lexer";
+import { first, follow, generatePredictionMap, TopDownAnalyser, stringifySyntaxTree } from "../src/syntax-analyser";
+import { Language, simpleLexPattern, Lexer } from "../src/lexer";
 
 describe("Testing syntax analyser", () =>
 {
@@ -76,13 +76,24 @@ describe("Testing syntax analyser", () =>
 
     it("Syntax analyse top-down", () =>
     {
+        const code = "num + 1 * foo + 1 - 1 + bar * (3 + (1 - 2) + 5)";
         const language: Language = {
             comment: /(\/\/.*[\r]?[\n]?)|((?:\/\*(?!\/)(?:.|\s)*?\*\/))/,
             whiteSpace: /\s+/,
             patterns: [
-                
+                ...simpleLexPattern("+-*/()".split("")),
+                {
+                    id: "number",
+                    pattern: /((\d)+)((\.((\d)+))?)((e(\+|-)?((\d)+))?)/
+                },
+                {
+                    id: "id",
+                    pattern: /[a-zA-Z_][a-zA-Z0-9]*/
+                }
             ]
         }
+        const lexer = new Lexer(language);
+        //console.log(lexer.parse(code).map(r => `<${r.name} ${r.attribute}>`));
         const syntaxDef: SyntaxDef = {
             "expr": "<expr> '+' <term> | <expr> '-' <term> | <term>",
             "term": "<term> '*' <factor> | <term> '/' <factor> | <factor>",
@@ -90,6 +101,8 @@ describe("Testing syntax analyser", () =>
         };
         const syntax = compileSyntax(syntaxDef);
         preventLeftRecursive(syntax);
-        
+        //console.log(syntax.toString());
+        const syntaxTree = new TopDownAnalyser(syntax).analyse(lexer.parse(code));
+        //console.log(stringifySyntaxTree(syntaxTree));
     });
 });

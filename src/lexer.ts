@@ -19,6 +19,7 @@ export interface LexToken
 {
     name: string;
     attribute: string;
+    eof?: boolean;
 }
 
 interface PatternMatchResult
@@ -102,14 +103,15 @@ export class TokenReader
     }
     get current():LexToken
     {
-        if (this.currentIdx > 0 || this.currentIdx >= this.tokens.length)
+        if (this.currentIdx < 0)
             return null;
+        if (this.currentIdx >= this.tokens.length)
+            return {
+                eof: true,
+                attribute: null,
+                name: null, 
+            };
         return this.tokens[this.currentIdx];
-    }
-    get next(): LexToken
-    {
-        this.currentIdx++;
-        return this.current;
     }
     take(): LexToken
     {
@@ -128,4 +130,17 @@ export function* tokenGenerator(tokens:LexToken[])
 {
     for (var i = 0; i < tokens.length; i++)
         yield tokens[i];
+}
+
+export function simpleLexPattern(patterns: string[]): LexPattern[]
+{
+    return patterns.map(p => <LexPattern>{
+        id: p,
+        pattern: new RegExp(escapeRegExp(p))
+    });
+}
+
+function escapeRegExp(string: string)
+{
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
 }

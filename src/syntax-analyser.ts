@@ -22,6 +22,27 @@ interface SyntaxTree
     root: SyntaxTreeNonTerminalNode;
 }
 
+export function stringifySyntaxTree(syntaxTree: SyntaxTree)
+{
+    return stringifyNonTerminal(syntaxTree.root);
+
+    function stringifyNode(node: SyntaxTreeNode): string
+    {
+        return node.children
+            ? stringifyNonTerminal(node as SyntaxTreeNonTerminalNode)
+            : stringifyTerminal(node as SyntaxTreeTerminalNode);
+    }
+    function stringifyNonTerminal(node: SyntaxTreeNonTerminalNode): string
+    {
+        return `<${node.production.name}>\r\n` + node.children.map(child => stringifyNode(child).split("\r\n").map(t => "\t" + t).join("\r\n")).join("\r\n");
+    }
+    function stringifyTerminal(node: SyntaxTreeTerminalNode)
+    {
+        return node.terminal.empty
+            ? "<>"
+            : `"${node.token.attribute}"`;
+    }
+}
 abstract class SyntaxAnalyser
 {
     syntax: Syntax;
@@ -43,7 +64,7 @@ export class TopDownAnalyser extends SyntaxAnalyser
     {
         entry = entry || this.syntax.entry;
         const tokenReader = new TokenReader(tokens);
-        tokenReader.next;
+        tokenReader.take();
         return {
             root: this.analyseTopDown(tokenReader, this.syntax.productions.get(entry)),
             syntax: this.syntax
@@ -60,15 +81,15 @@ export class TopDownAnalyser extends SyntaxAnalyser
         };
         for (let i = 0; i < nonTerminal.sequence.length; i++)
         {
-            node.children.push(
-                nonTerminal.sequence[i].empty
-                    ? <SyntaxTreeTerminalNode>{ terminal: nonTerminal.sequence[i], token: null }
-                    : nonTerminal.sequence[i].productionName
-                        ? this.analyseTopDown(tokens, this.syntax.productions.get(nonTerminal.sequence[i].productionName))
-                        : nonTerminal.sequence[i].tokenName === tokens.current.name
-                            ? <SyntaxTreeTerminalNode>{ terminal: nonTerminal.sequence[i], token: tokens.take() }
-                            : syntaxError()
-            );
+            const result = nonTerminal.sequence[i].empty
+                ? <SyntaxTreeTerminalNode>{ terminal: nonTerminal.sequence[i], token: null }
+                : nonTerminal.sequence[i].productionName
+                    ? this.analyseTopDown(tokens, this.syntax.productions.get(nonTerminal.sequence[i].productionName))
+                    : nonTerminal.sequence[i].tokenName === tokens.current.name
+                        ? <SyntaxTreeTerminalNode>{ terminal: nonTerminal.sequence[i], token: tokens.take() }
+                        : syntaxError();
+            
+            node.children.push(result);
         }
         return node;
         function syntaxError(): any
@@ -97,6 +118,22 @@ export class TopDownAnalyser extends SyntaxAnalyser
         }
         throw new Error("Syntax error.");
 
+        function stringifyNode(node: SyntaxTreeNode): string
+        {
+            return node.children
+                ? stringifyNonTerminal(node as SyntaxTreeNonTerminalNode)
+                : stringifyTerminal(node as SyntaxTreeTerminalNode);
+        }
+        function stringifyNonTerminal(node: SyntaxTreeNonTerminalNode): string
+        {
+            return `<${node.production.name}>\r\n` + node.children.map(child => stringifyNode(child).split("\r\n").map(t => "\t" + t).join("\r\n")).join("\r\n");
+        }
+        function stringifyTerminal(node: SyntaxTreeTerminalNode)
+        {
+            return node.terminal.empty
+                ? "<>"
+                : node.token.attribute;
+        }
     }
 }
 
@@ -144,7 +181,7 @@ export function first(unit: Production | TerminalUnit, syntax: Syntax): Terminal
 export function startWith(token: LexToken, production: Production, syntax:Syntax): SpecificProduction[]
 {
     return linq.from(production.group)
-        .where(nt => first(nt.sequence, syntax).some(t => t.tokenName === token.name))
+        .where(nt => first(nt.sequence, syntax).some(t =>t.empty || t.tokenName === token.name))
         .select(nt => <SpecificProduction>{
             name: production.name,
             sequence: nt.sequence
