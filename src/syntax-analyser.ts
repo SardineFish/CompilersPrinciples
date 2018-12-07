@@ -56,10 +56,11 @@ abstract class SyntaxAnalyser
 export class TopDownAnalyser extends SyntaxAnalyser
 {
     syntax: Syntax;
-    predictionMap: Map<string, SpecificProduction[]> = new Map();
+    predictionMap: PredictionMap;
     constructor(syntax: Syntax)
     {
         super(syntax);
+        generatePredictionMap(this.syntax, true);
     }
     analyse(tokens: LexToken[], entry?: string): SyntaxTree
     {
@@ -265,10 +266,9 @@ export class PredictionMap
     productions: string[] = [];
     terminals: string[] = [];
     allowAmbiguous: boolean = false;
-    set(key: [string, string], value: SpecificProduction)
+    set(productionName:string, tokenName:string, value: SpecificProduction)
     {
-        const [production, terminal] = key;
-        const keyM = `<${production}> "${terminal}"`;
+        const keyM = `<${productionName}> "${tokenName}"`;
         if (this.map.has(keyM) && this.map.get(keyM).every(p => !equalSpecificProduction(p, value)))
         {
             if (!this.allowAmbiguous)
@@ -280,16 +280,18 @@ export class PredictionMap
         {
             this.map.set(keyM, [value]);
         }
-        if (!this.productions.includes(production))
-            this.productions.push(production);
-        if (!this.terminals.includes(terminal))
-            this.terminals.push(terminal);
+        if (!this.productions.includes(productionName))
+            this.productions.push(productionName);
+        if (!this.terminals.includes(tokenName))
+            this.terminals.push(tokenName);
         return this;
     }
     get(productionName:string, tokenName:string): SpecificProduction[]
     {
         const keyM = `<${productionName}> "${tokenName}"`;
-        return this.map.get(keyM);
+        if (this.map.has(keyM))
+            return this.map.get(keyM);
+        return [];
     }
     toString(space: number = 4)
     {
@@ -312,13 +314,13 @@ export function generatePredictionMap(syntax: Syntax, allowAmbiguous: boolean = 
             nt =>
             {
                 const headers = first(nt.sequence, syntax);
-                headers.filter(t => !t.empty).forEach(t => map.set([name, t.tokenName], {
+                headers.filter(t => !t.empty).forEach(t => map.set(name, t.tokenName, {
                     name: name,
                     sequence: nt.sequence
                 }));
                 if (headers.some(t => t.empty))
                 {
-                    follow(new NonTerminalUnit(name), syntax).forEach(t => map.set([name, t.eof ? "$" : t.tokenName], {
+                    follow(new NonTerminalUnit(name), syntax).forEach(t => map.set(name, t.eof ? "$" : t.tokenName, {
                         name: name,
                         sequence: nt.sequence
                     }));
