@@ -109,7 +109,7 @@ export class TokenReader
             return {
                 eof: true,
                 attribute: null,
-                name: null, 
+                name: "$", 
             };
         return this.tokens[this.currentIdx];
     }

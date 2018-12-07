@@ -3,6 +3,9 @@ import assert from "assert";
 import { expect } from "chai";
 import { first, follow, generatePredictionMap, TopDownAnalyser, stringifySyntaxTree } from "../src/syntax-analyser";
 import { Language, simpleLexPattern, Lexer } from "../src/lexer";
+import fs from "fs";
+import Path from "path";
+import { promisify } from "util";
 
 describe("Testing syntax analyser", () =>
 {
@@ -74,35 +77,84 @@ describe("Testing syntax analyser", () =>
         expect(() => generatePredictionMap(syntax)).throw(Error, "Ambiguous syntax");
     });
 
-    it("Syntax analyse top-down", () =>
+    describe("Syntax analyse top-down", async () =>
     {
-        const code = "num + 1 * foo + 1 - 1 + bar * (3 + (1 - 2) + 5)";
-        const language: Language = {
-            comment: /(\/\/.*[\r]?[\n]?)|((?:\/\*(?!\/)(?:.|\s)*?\*\/))/,
-            whiteSpace: /\s+/,
-            patterns: [
-                ...simpleLexPattern("+-*/()".split("")),
-                {
-                    id: "number",
-                    pattern: /((\d)+)((\.((\d)+))?)((e(\+|-)?((\d)+))?)/
-                },
-                {
-                    id: "id",
-                    pattern: /[a-zA-Z_][a-zA-Z0-9]*/
-                }
-            ]
-        }
-        const lexer = new Lexer(language);
-        //console.log(lexer.parse(code).map(r => `<${r.name} ${r.attribute}>`));
-        const syntaxDef: SyntaxDef = {
-            "expr": "<expr> '+' <term> | <expr> '-' <term> | <term>",
-            "term": "<term> '*' <factor> | <term> '/' <factor> | <factor>",
-            "factor": "'number' | 'id' | '(' <expr> ')'"
-        };
-        const syntax = compileSyntax(syntaxDef);
-        preventLeftRecursive(syntax);
-        //console.log(syntax.toString());
-        const syntaxTree = new TopDownAnalyser(syntax).analyse(lexer.parse(code));
-        //console.log(stringifySyntaxTree(syntaxTree));
+        it("Expression analyse", async () =>
+        {
+            const code = "num + 1 * foo + 1 - 1 + bar * (3 + (1 - 2) + 5)";
+            const language: Language = {
+                comment: /(\/\/.*[\r]?[\n]?)|((?:\/\*(?!\/)(?:.|\s)*?\*\/))/,
+                whiteSpace: /\s+/,
+                patterns: [
+                    ...simpleLexPattern("+-*/()".split("")),
+                    {
+                        id: "number",
+                        pattern: /((\d)+)((\.((\d)+))?)((e(\+|-)?((\d)+))?)/
+                    },
+                    {
+                        id: "id",
+                        pattern: /[a-zA-Z_][a-zA-Z0-9]*/
+                    }
+                ]
+            }
+            const lexer = new Lexer(language);
+            //console.log(lexer.parse(code).map(r => `<${r.name} ${r.attribute}>`));
+            const syntaxDef: SyntaxDef = {
+                "expr": "<expr> '+' <term> | <expr> '-' <term> | <term>",
+                "term": "<term> '*' <factor> | <term> '/' <factor> | <factor>",
+                "factor": "'number' | 'id' | '(' <expr> ')'"
+            };
+            const syntax = compileSyntax(syntaxDef);
+            preventLeftRecursive(syntax);
+            //console.log(syntax.toString());
+            const syntaxTree = new TopDownAnalyser(syntax).analyse(lexer.parse(code));
+            const start = Date.now();
+            const result = stringifySyntaxTree(syntaxTree)
+            const end = Date.now();
+            console.log(`${end - start} ms`)
+            const expectResult = (await promisify(fs.readFile)(Path.resolve("./test/syntax-tree-top-down.txt"))).toString();
+            expect(result).to.be.equal(expectResult);
+        });
+
+        it("Structure analyse", () =>
+        {
+            const language: Language = {
+                comment: /(\/\/.*[\r]?[\n]?)|((?:\/\*(?!\/)(?:.|\s)*?\*\/))/,
+                whiteSpace: /\s+/,
+                patterns: [
+                    ...simpleLexPattern("+-*/(){};".split("")),
+                    ...simpleLexPattern([
+                        "if",
+                        "else if",
+                        "else"
+                    ]),
+                    {
+                        id: "number",
+                        pattern: /((\d)+)((\.((\d)+))?)((e(\+|-)?((\d)+))?)/
+                    },
+                    {
+                        id: "id",
+                        pattern: /[a-zA-Z_][a-zA-Z0-9]*/
+                    }
+                ]
+            };
+            const lexer = new Lexer(language);
+            //console.log(lexer.parse(code).map(r => `<${r.name} ${r.attribute}>`));
+            const syntaxDef: SyntaxDef = {
+                "syntax": "<statement> | <statement> <syntax>",
+                "statement": "<if> | <expression> ';' | <>",
+                "if": "'if' '(' <expr> ')' <block> <else-if> <else>",
+                "else-if": "'else if' '(' <expr> ')' <block> | <>",
+                "else": "'else' <block> | <>",
+                "block":"<statement> | '{' <syntax> '}' ",
+                "expr": "<expr> '+' <term> | <expr> '-' <term> | <term>",
+                "term": "<term> '*' <factor> | <term> '/' <factor> | <factor>",
+                "factor": "'number' | 'id' | '(' <expr> ')'"
+            };
+            const syntax = compileSyntax(syntaxDef);
+            preventLeftRecursive(syntax);
+            console.log(syntax.toString());
+        });
     });
+    
 });

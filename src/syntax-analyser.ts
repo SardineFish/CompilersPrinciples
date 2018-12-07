@@ -60,7 +60,7 @@ export class TopDownAnalyser extends SyntaxAnalyser
     constructor(syntax: Syntax)
     {
         super(syntax);
-        generatePredictionMap(this.syntax, true);
+        this.predictionMap = generatePredictionMap(this.syntax, true);
     }
     analyse(tokens: LexToken[], entry?: string): SyntaxTree
     {
@@ -104,7 +104,7 @@ export class TopDownAnalyser extends SyntaxAnalyser
     {
         const current = tokens.current;
         const currentIdx = tokens.currentIdx;
-        const nonTerminals = startWith(current, production, this.syntax);
+        const nonTerminals = this.predictionMap.get(production.name, tokens.current.name);//startWith(current, production, this.syntax);
         for (let i = 0; i < nonTerminals.length; i++)
         {
             try

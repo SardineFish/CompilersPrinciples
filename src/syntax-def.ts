@@ -71,13 +71,13 @@ const syntaxDefLanguage: Language = {
     patterns: [
         {
             id: "production",
-            pattern: /<(\S*?)>/,
-            action: (input) => /<(\S*)>/.exec(input)[1]
+            pattern: /<([^<>]*?)>/,
+            action: (input) => /<(.*)>/.exec(input)[1]
         },
         {
             id: "token",
-            pattern: /("\S*?")|('\S*?')/,
-            action: (input) => /(?:"|')(\S*)(?:"|')/.exec(input)[1]
+            pattern: /("[^"]*?")|('[^']*?')/,
+            action: (input) => /(?:"|')(.*)(?:"|')/.exec(input)[1]
         },
     ]
 }
