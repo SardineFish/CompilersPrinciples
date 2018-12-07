@@ -56,6 +56,7 @@ abstract class SyntaxAnalyser
 export class TopDownAnalyser extends SyntaxAnalyser
 {
     syntax: Syntax;
+    predictionMap: Map<string, SpecificProduction[]> = new Map();
     constructor(syntax: Syntax)
     {
         super(syntax);
@@ -260,26 +261,34 @@ function fixSpace(text: string, space: number)
 }
 export class PredictionMap
 {
-    map: Map<string, SpecificProduction> = new Map();
+    map: Map<string, SpecificProduction[]> = new Map();
     productions: string[] = [];
     terminals: string[] = [];
+    allowAmbiguous: boolean = false;
     set(key: [string, string], value: SpecificProduction)
     {
         const [production, terminal] = key;
         const keyM = `<${production}> "${terminal}"`;
-        if (this.map.has(keyM) && !equalSpecificProduction(this.map.get(keyM), value))
-            throw new Error("Ambiguous syntax");
-        this.map.set(keyM, value);
+        if (this.map.has(keyM) && this.map.get(keyM).every(p => !equalSpecificProduction(p, value)))
+        {
+            if (!this.allowAmbiguous)
+                throw new Error("Ambiguous syntax");
+            else
+                this.map.get(keyM).push(value);
+        }
+        else
+        {
+            this.map.set(keyM, [value]);
+        }
         if (!this.productions.includes(production))
             this.productions.push(production);
         if (!this.terminals.includes(terminal))
             this.terminals.push(terminal);
         return this;
     }
-    get(key: [string, string]): SpecificProduction
+    get(productionName:string, tokenName:string): SpecificProduction[]
     {
-        const [production, terminal] = key;
-        const keyM = `<${production}> "${terminal}"`;
+        const keyM = `<${productionName}> "${tokenName}"`;
         return this.map.get(keyM);
     }
     toString(space: number = 4)
@@ -287,13 +296,16 @@ export class PredictionMap
         space = space || 1;
         return `${fixSpace("", space)}${this.terminals.map(t => fixSpace(`"${t}"`, space)).join("")} \r\n${this.productions.map(
             production => `${fixSpace(`<${production}>`, space)}${this.terminals.map(
-                t => fixSpace(stringifySpecificProduction(this.get([production, t])), space)
+                t => fixSpace(stringifySpecificProduction(this.get(production, t)[0]), space)
             ).join("")}`).join("\r\n")}`;
     }
 }
+export function generatePredictionMap(syntax: Syntax, allowAmbiguous: true): PredictionMap
 export function generatePredictionMap(syntax: Syntax): PredictionMap
+export function generatePredictionMap(syntax: Syntax, allowAmbiguous: boolean = false): PredictionMap
 {
     const map: PredictionMap = new PredictionMap();
+    map.allowAmbiguous = allowAmbiguous;
     syntax.productions.forEach((production, name) =>
     {
         production.group.forEach(
