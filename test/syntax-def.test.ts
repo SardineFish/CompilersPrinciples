@@ -53,27 +53,27 @@ describe("Testing syntax defination", () =>
     it("Prevent instant left recursive", () =>
     {
         var leftRecursiveSyntax: SyntaxDef = {
-            "A": "<A> <a1> | <A> <a2> | <A> <a3> | <b1> | <b2> | <b3>"
+            "A": "<A> 'a1' | <A> 'a2' | <A> 'a3' | 'b1' | 'b2' | 'b3'"
         };
         let syntax = compileSyntax(leftRecursiveSyntax);
         preventInstantLeftRecursive(syntax, syntax.productions.get("A"));
         const expect = [
-            '<A> ::= <b1> <A-1> | <b2> <A-1> | <b3> <A-1>',
-            '<A-1> ::= <a1> <A-1> | <a2> <A-1> | <a3> <A-1> | <>'
+            '<A> ::= "b1" <A-1> | "b2" <A-1> | "b3" <A-1>',
+            '<A-1> ::= "a1" <A-1> | "a2" <A-1> | "a3" <A-1> | <>'
         ].join("\r\n");
         assert.strictEqual(syntax.toString(), expect);
     });
     it("Compress production", () =>
     {
         let leftRecursiveSyntax = {
-            "S": "<A> <a> | <b>",
-            "A": "<A> <c> | <S> <d> | <>"
+            "S": '<A> "a" | "b"',
+            "A": '<A> "c" | <S> "d" | <>'
         };
         let syntax = compileSyntax(leftRecursiveSyntax);
         syntax.productions.set("A", compressProduction(syntax.productions.get("A"), syntax.productions.get("S")));
         const expect = [
-            '<S> ::= <A> <a> | <b>',
-            '<A> ::= <A> <c> | <A> <a> <d> | <b> <d> | <>'
+            '<S> ::= <A> "a" | "b"',
+            '<A> ::= <A> "c" | <A> "a" "d" | "b" "d" | <>'
         ].join("\r\n");
         //console.log(syntax.toString());
         assert.strictEqual(syntax.toString(), expect);
@@ -81,15 +81,16 @@ describe("Testing syntax defination", () =>
     it("Prevent left recursive", () =>
     {
         const syntaxDef: SyntaxDef = {
-            "S": "<A> <a> | <b>",
-            "A": "<A> <c> | <S> <d> | <>"
+            "S": '<A> "a" | "b"',
+            "A": '<A> "c" | <S> "d" | <>'
         };
         const syntax = compileSyntax(syntaxDef);
         preventLeftRecursive(syntax);
+        //console.log(syntax.toString());
         const expect = compileSyntax({
-            "S": "<A><a>|<b>",
-            "A": "<b><d><A-1>|<A-1>",
-            "A-1": "<c><A-1>|<a><d><A-1>|<>"
+            "S": "<A>'a'|'b'",
+            "A": "'b''d'<A-1>|<A-1>",
+            "A-1": "'c'<A-1>|'a''d'<A-1>|<>"
         });
         //console.log(syntax.toString());
         assert.deepStrictEqual(syntax, expect);

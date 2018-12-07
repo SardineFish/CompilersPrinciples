@@ -113,6 +113,10 @@ export class TokenReader
             };
         return this.tokens[this.currentIdx];
     }
+    get eof()
+    {
+        return this.currentIdx >= this.tokens.length;
+    }
     take(): LexToken
     {
         const token = this.current;
@@ -124,6 +128,7 @@ export class TokenReader
         this.currentIdx = idx;
         return this.current;
     }
+    
 }
 
 export function* tokenGenerator(tokens:LexToken[])

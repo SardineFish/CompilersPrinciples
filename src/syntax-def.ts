@@ -90,7 +90,20 @@ export function compileSyntax(syntax: SyntaxDef, entry?: string): Syntax
         output.productions.set(key, compileProduction(key, syntax[key]));
     });
     output.entry = entry ? entry : Object.keys(syntax)[0];
+    checkSyntax(output);
     return output;
+}
+function checkSyntax(syntax: Syntax)
+{
+    syntax.productions.forEach(
+        p => p.group.forEach(
+            nt => nt.sequence.forEach(
+                t =>
+                {
+                    if (t.productionName && !syntax.productions.has(t.productionName))
+                        throw new Error(`Undefined production '${t.productionName}' in '${p.name}'`);
+                }
+    )));
 }
 export function compileProduction(name: string, text: string): Production
 {
