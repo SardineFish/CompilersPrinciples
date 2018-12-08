@@ -31,26 +31,47 @@ describe("Testing syntax analyser", () =>
         expect(syntax.toString()).be.equals(expectResult.toString());
     });
 
-    it("Function first(A)", () =>
+    describe("Set FIRST", () =>
     {
-        const syntaxDef: SyntaxDef = {
-            "expr": "<expr> '+' <term> | <expr> '-' <term> | <term>",
-            "term": "<term> '*' <factor> | <term> '/' <factor> | <factor>",
-            "factor": "'number' | 'id' | '(' <expr> ')'"
-        };
-        const syntax = compileSyntax(syntaxDef);
-        preventLeftRecursive(syntax); 
-        const result = first(syntax.productions.get("expr").group[0].sequence, syntax);
-        const expect = [
-            { tokenName: "number" },
-            { tokenName: "id" },
-            { tokenName: "(" }
-        ];
-        assert.deepStrictEqual(result, expect);
-        removeLeftFactor(syntax);
+        it("Expression syntax", () =>
+        {
+            const syntaxDef: SyntaxDef = {
+                "expr": "<expr> '+' <term> | <expr> '-' <term> | <term>",
+                "term": "<term> '*' <factor> | <term> '/' <factor> | <factor>",
+                "factor": "'number' | 'id' | '(' <expr> ')'"
+            };
+            const syntax = compileSyntax(syntaxDef);
+            preventLeftRecursive(syntax);
+            const result = first(syntax.productions.get("expr").group[0].sequence, syntax);
+            const expect = [
+                { tokenName: "number" },
+                { tokenName: "id" },
+                { tokenName: "(" }
+            ];
+            assert.deepStrictEqual(result, expect);
+            removeLeftFactor(syntax);
+        });
+        it("Empty production", () =>
+        {
+            const syntaxDef: SyntaxDef = {
+                "S": "<A> <B> <C>",
+                "A": "'a' | <>",
+                "B": "'b' | <>",
+                "C": "'c' | <>"
+            };
+            const syntax = compileSyntax(syntaxDef);
+            preventLeftRecursive(syntax);
+            const result = first(syntax.productions.get("S").group[0].sequence, syntax);
+            expect(result).to.have.deep.members([
+                { tokenName: "a" },
+                { tokenName: "b" },
+                { tokenName: "c" },
+                { empty: true }
+            ]);
+        });
     });
 
-    it("Function follow(A)", () =>
+    it("Set FOLLOW", () =>
     {
         const syntaxDef: SyntaxDef = {
             "expr": "<expr> '+' <term> | <expr> '-' <term> | <term>",

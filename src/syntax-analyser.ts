@@ -224,7 +224,7 @@ export function first(sequence: TerminalUnit[], syntax: Syntax): TerminalUnit[]
     let result: TerminalUnit[] = [];
     for (let i = 0; i < sequence.length; i++)
     {
-        let FIRSTi = <TerminalUnit[]>[].concat(...syntax.productions.get(sequence[0].productionName).group.map(nt => first(nt.sequence, syntax)));
+        let FIRSTi = <TerminalUnit[]>[].concat(...syntax.productions.get(sequence[i].productionName).group.map(nt => first(nt.sequence, syntax)));
         result = result.concat(...FIRSTi);
         if (FIRSTi.every(t => !t.empty))
             break;
