@@ -61,7 +61,7 @@ abstract class SyntaxAnalyser
     }
 }
 
-export class TopDownAnalyser extends SyntaxAnalyser
+export class TopDownRecursiveAnalyser extends SyntaxAnalyser
 {
     syntax: Syntax;
     predictionMap: PredictionMap;
@@ -219,11 +219,17 @@ export function startWith(token: LexToken, production: Production, syntax:Syntax
 }
 export function first(sequence: TerminalUnit[], syntax: Syntax): TerminalUnit[]
 {
-    return sequence[0].empty
-        ? [sequence[0]]
-        : sequence[0].productionName
-            ? <TerminalUnit[]>[].concat(...syntax.productions.get(sequence[0].productionName).group.map(nt => first(nt.sequence, syntax)))
-            : [sequence[0]];
+    if (sequence[0].empty || sequence[0].tokenName)
+        return [sequence[0]];
+    let result: TerminalUnit[] = [];
+    for (let i = 0; i < sequence.length; i++)
+    {
+        let FIRSTi = <TerminalUnit[]>[].concat(...syntax.productions.get(sequence[0].productionName).group.map(nt => first(nt.sequence, syntax)));
+        result = result.concat(...FIRSTi);
+        if (FIRSTi.every(t => !t.empty))
+            break;
+    }
+    return linq.from(result).distinct(terminalStringify).toArray();
 }
 
 export function follow(unit: TerminalUnit, syntax: Syntax): TerminalUnit[]
@@ -358,3 +364,4 @@ export function generatePredictionMap(syntax: Syntax, allowAmbiguous: boolean = 
     });
     return map;
 }
+

@@ -232,3 +232,111 @@ export function preventInstantLeftRecursive(syntax: Syntax, production: Producti
     return [production, null];
 }
 
+export function removeLeftFactor(syntax: Syntax)
+{
+    let keys: string[] = [];
+    for (let i = 0; i < syntax.productions.size; i++)
+    {
+        keys = Array.from(syntax.productions.keys());
+        removeLeftFactorProduction(syntax.productions.get(keys[i]), syntax);
+    }
+}
+interface TreeNode<T>
+{
+    element: T;
+    children: TreeNode<T>[];
+}
+function removeLeftFactorProduction(production: Production, syntax: Syntax)
+{
+    let tree: TreeNode<TerminalUnit> = {
+        element: null,
+        children: []
+    };
+    production.group.forEach(rule =>
+    {
+        let p = tree;
+        for (let i = 0; i < rule.sequence.length; i++)
+        {
+            let idx = p.children.findIndex(t => terminalEqual(t.element, rule.sequence[i]));
+            if (idx < 0)
+            {
+                p.children.push({
+                    element: rule.sequence[i],
+                    children: []
+                });
+                p = p.children[p.children.length - 1];
+            }
+            else
+            {
+                p = p.children[idx];
+            }
+        }
+        p.children.push({
+            element: new EmptyTerminal(),
+            children: []
+        });
+    });
+    production.group = tree.children.map(child => rebuildGrammerRule(child));
+
+    function rebuildGrammerRule(node: TreeNode<TerminalUnit>): NonTerminal
+    {
+        let sequence: TerminalUnit[] = [node.element];
+        let p = node;
+        while (p.children.length == 1)
+        {
+            p = p.children[0];
+            if (!p.element.empty)
+                sequence.push(p.element);
+        }
+        let group: NonTerminal[] = <NonTerminal[]>[].concat(...p.children.map(child => extractChildren(child)));
+        let noEmpty = true;
+        group = group.filter(g => g.sequence[0].empty ? noEmpty = false : true);
+        if (!noEmpty)
+            group.push({sequence:[new EmptyTerminal()]});
+        if (group.length > 0)
+        {
+            let id = 1;
+            while (syntax.productions.has(`${production.name}-${id}`))
+                id++;
+            let subName = `${production.name}-${id}`;
+            syntax.productions.set(subName, {
+                name: subName,
+                group: group
+            });
+            sequence.push(new NonTerminalUnit(subName));
+        }
+        return { sequence: sequence };
+    }
+    function extractChildren(node: TreeNode<TerminalUnit>): NonTerminal[]
+    {
+        if (node.children.length <= 0)
+        {
+            return [
+                {
+                    sequence: [node.element]
+                }
+            ];
+        }
+        else
+        {
+            return [].concat(...node.children.map(child =>
+            {
+                let children = linq.from(extractChildren(child))
+                    .where(t => t.sequence.length > 0)
+                    .where(t => !t.sequence[0].empty)
+                    .select(t => t.sequence)
+                    .toArray();
+                    //extractChildren(child).filter(t => t.sequence.length > 0 && !t.sequence[0].empty).map(t => t.sequence);
+
+                if (children.length <= 0)
+                    return [<NonTerminal>{
+                        sequence: [node.element]
+                    }];
+
+                return children.map(s => <TerminalUnit>{
+                    sequence: [node.element].concat(...s)
+                });
+            }));
+        }
+    }
+}

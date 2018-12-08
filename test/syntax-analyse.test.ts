@@ -1,7 +1,7 @@
-import { compileSyntax, SyntaxDef, preventLeftRecursive, NonTerminalUnit, Terminal, terminalStringify} from "../src/syntax-def";
+import { compileSyntax, SyntaxDef, preventLeftRecursive, NonTerminalUnit, Terminal, terminalStringify, removeLeftFactor} from "../src/syntax-def";
 import assert from "assert";
 import { expect } from "chai";
-import { first, follow, generatePredictionMap, TopDownAnalyser, stringifySyntaxTree } from "../src/syntax-analyser";
+import { first, follow, generatePredictionMap, TopDownRecursiveAnalyser, stringifySyntaxTree } from "../src/syntax-analyser";
 import { Language, simpleLexPattern, Lexer } from "../src/lexer";
 import fs from "fs";
 import Path from "path";
@@ -10,6 +10,27 @@ import { fileTestCase } from "./lib";
 
 describe("Testing syntax analyser", () =>
 {
+    it("Left factor", () =>
+    {
+        const syntaxDef: SyntaxDef = {
+            "S": "'A''B''C''D' | 'A''B' | 'C''D''Z''F''G' | 'C''D''E''F''H' | <>",
+            "R":"'A'|'A''B'|'A''B''C'|'A''B''C''D'"
+        };
+        const syntax = compileSyntax(syntaxDef);
+        removeLeftFactor(syntax);
+        const expectResult = compileSyntax({
+            "S"      : '"A" "B" <S-1> | "C" "D" <S-2> | <>',
+            "R"      : '"A" <R-1>',
+            "S-1"    : '"C" "D" | <>',
+            "S-2"    : '"Z" "F" "G" | "E" "F" "H"',
+            "R-1"    : '"B" <R-1-1> | <>',
+            "R-1-1"  : '"C" <R-1-1-1> | <>',
+            "R-1-1-1": '"D" | <>',
+        });
+        //console.log(syntax.toString());
+        expect(syntax.toString()).be.equals(expectResult.toString());
+    });
+
     it("Function first(A)", () =>
     {
         const syntaxDef: SyntaxDef = {
@@ -26,6 +47,7 @@ describe("Testing syntax analyser", () =>
             { tokenName: "(" }
         ];
         assert.deepStrictEqual(result, expect);
+        removeLeftFactor(syntax);
     });
 
     it("Function follow(A)", () =>
@@ -109,7 +131,7 @@ describe("Testing syntax analyser", () =>
                 const syntax = compileSyntax(syntaxDef);
                 preventLeftRecursive(syntax);
                 //console.log(syntax.toString());
-                const syntaxResult = new TopDownAnalyser(syntax).analyse(lexer.parse(code));
+                const syntaxResult = new TopDownRecursiveAnalyser(syntax).analyse(lexer.parse(code));
                 const result = stringifySyntaxTree(syntaxResult.syntaxTree);
                 expect(result).to.be.equal(expectResult);
                 expect(syntaxResult.diagnostics).to.have.lengthOf(0);
@@ -159,10 +181,11 @@ describe("Testing syntax analyser", () =>
                 };
                 const syntax = compileSyntax(syntaxDef);
                 preventLeftRecursive(syntax);
-                const syntaxResult = new TopDownAnalyser(syntax).analyse(lexer.parse(code));
+                removeLeftFactor(syntax);
+                const syntaxResult = new TopDownRecursiveAnalyser(syntax).analyse(lexer.parse(code));
                 const result = stringifySyntaxTree(syntaxResult.syntaxTree);
+                //console.log(result);
                 expect(result).be.equal(expectResult);
-                expect(syntaxResult.diagnostics.map(d => d.message)).to.have.members(["Unexpect symbol 'else'"]);
             });
         });
     });
