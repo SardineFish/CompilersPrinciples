@@ -21,7 +21,15 @@ interface SyntaxTree
     syntax: Syntax;
     root: SyntaxTreeNonTerminalNode;
 }
-
+interface Diagnostic
+{
+    message: string;
+}
+interface SyntaxAnalyseResult
+{
+    diagnostics: Diagnostic[];
+    syntaxTree: SyntaxTree;
+}
 export function stringifySyntaxTree(syntaxTree: SyntaxTree)
 {
     return stringifyNonTerminal(syntaxTree.root);
@@ -46,7 +54,7 @@ export function stringifySyntaxTree(syntaxTree: SyntaxTree)
 abstract class SyntaxAnalyser
 {
     syntax: Syntax;
-    abstract analyse(tokens: LexToken[], entry?: string): SyntaxTree;
+    abstract analyse(tokens: LexToken[], entry?: string): SyntaxAnalyseResult;
     constructor(syntax: Syntax)
     {
         this.syntax = syntax;
@@ -62,15 +70,35 @@ export class TopDownAnalyser extends SyntaxAnalyser
         super(syntax);
         this.predictionMap = generatePredictionMap(this.syntax, true);
     }
-    analyse(tokens: LexToken[], entry?: string): SyntaxTree
+    analyse(tokens: LexToken[], entry?: string): SyntaxAnalyseResult
     {
         entry = entry || this.syntax.entry;
         const tokenReader = new TokenReader(tokens);
         tokenReader.take();
-        return {
-            root: this.analyseTopDown(tokenReader, this.syntax.productions.get(entry)),
-            syntax: this.syntax
+        const result: SyntaxAnalyseResult = {
+            diagnostics: [],
+            syntaxTree: null
         };
+        try
+        {
+            result.syntaxTree = {
+                root: this.analyseTopDown(tokenReader, this.syntax.productions.get(entry)),
+                syntax: this.syntax
+            };
+            if (!tokenReader.eof)
+            {
+                result.diagnostics.push({
+                    message: `Unexpect symbol '${tokenReader.current.attribute}'`
+                });
+            }
+        }
+        catch (ex)
+        {
+            result.diagnostics.push({
+                message: ex.message
+            });
+        }
+        return result;
     }
     analyseNonTerminal(tokens: TokenReader, nonTerminal: NonTerminal)
     {
@@ -142,7 +170,7 @@ export class TopDownAnalyser extends SyntaxAnalyser
 export class LL1Analyser extends SyntaxAnalyser
 {
 
-    analyse(tokens: LexToken[], entry?: string): SyntaxTree
+    analyse(tokens: LexToken[], entry?: string): SyntaxAnalyseResult
     {
         throw new Error("Method not implemented.");
     }

@@ -109,9 +109,10 @@ describe("Testing syntax analyser", () =>
                 const syntax = compileSyntax(syntaxDef);
                 preventLeftRecursive(syntax);
                 //console.log(syntax.toString());
-                const syntaxTree = new TopDownAnalyser(syntax).analyse(lexer.parse(code));
-                const result = stringifySyntaxTree(syntaxTree);
+                const syntaxResult = new TopDownAnalyser(syntax).analyse(lexer.parse(code));
+                const result = stringifySyntaxTree(syntaxResult.syntaxTree);
                 expect(result).to.be.equal(expectResult);
+                expect(syntaxResult.diagnostics).to.have.lengthOf(0);
             });
         });
 
@@ -158,9 +159,10 @@ describe("Testing syntax analyser", () =>
                 };
                 const syntax = compileSyntax(syntaxDef);
                 preventLeftRecursive(syntax);
-                const syntaxTree = new TopDownAnalyser(syntax).analyse(lexer.parse(code));
-                const result = stringifySyntaxTree(syntaxTree);
+                const syntaxResult = new TopDownAnalyser(syntax).analyse(lexer.parse(code));
+                const result = stringifySyntaxTree(syntaxResult.syntaxTree);
                 expect(result).be.equal(expectResult);
+                expect(syntaxResult.diagnostics.map(d => d.message)).to.have.members(["Unexpect symbol 'else'"]);
             });
         });
     });
