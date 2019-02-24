@@ -109,7 +109,7 @@ export function compileProduction(name: string, text: string): Production
 {
     return {
         name: name,
-        group: text.split("|").map(t => compileNonTerminal(t)),
+        group: text.split(/(?<!\\)\|/).map(t => compileNonTerminal(t)),
     };
 }
 export function compileNonTerminal(text: string): NonTerminal
@@ -117,6 +117,7 @@ export function compileNonTerminal(text: string): NonTerminal
     return {
         sequence: new Lexer(syntaxDefLanguage).parse(text).map(token =>
         {
+            token.attribute = token.attribute.replace(/\\\|/g, "|");
             let output: TerminalUnit = {
             };
             if (token.name === "production")
@@ -188,14 +189,22 @@ export function preventLeftRecursive(syntax: Syntax)
     let productions = Array.from(syntax.productions.values());
     for (let i = 0; i < productions.length; i++)
     {
-        for (let j = 0; j < i; j++)
+        try
         {
-            productions[i].group = compressProduction(productions[i], productions[j]).group;
+            for (let j = 0; j < i; j++)
+            {
+                productions[i].group = compressProduction(productions[i], productions[j]).group;
+            }
+            let [production, subProduction] = preventInstantLeftRecursive(syntax, productions[i]);
+            productions[i] = production;
+            if (subProduction)
+                productions.push(subProduction);
         }
-        let [production, subProduction] = preventInstantLeftRecursive(syntax, productions[i]);
-        productions[i] = production;
-        if (subProduction)
-            productions.push(subProduction);
+        catch (err)
+        {
+            console.error(`Failed to process production <${productions[i].name}>: ${err.message}`);
+            throw err;
+        }
     }
 }
 export function preventInstantLeftRecursive(syntax: Syntax, production: Production): [Production, Production]
