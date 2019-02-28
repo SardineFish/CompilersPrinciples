@@ -193,7 +193,7 @@ export function preventLeftRecursive(syntax: Syntax)
         {
             for (let j = 0; j < i; j++)
             {
-                if (productions[j].group.some(nt => nt.sequence[0].productionName == productions[i].name))
+                //if (productions[j].group.some(nt => nt.sequence[0].productionName == productions[i].name))
                     productions[i].group = compressProduction(productions[i], productions[j]).group;
             }
             let [production, subProduction] = preventInstantLeftRecursive(syntax, productions[i]);
