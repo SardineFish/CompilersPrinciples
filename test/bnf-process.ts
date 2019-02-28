@@ -62,7 +62,7 @@ const syntax = compileSyntax(syntaxDef, "syntax");
 
 preventLeftRecursive(syntax);
 removeLeftFactor(syntax);
-printSyntax(syntax);
+//printSyntax(syntax);
 
 const code = `
 int a = 0,b=5;
@@ -100,7 +100,7 @@ void foo (char *x, int y)
 
 int main()
 {
-    printf("Hello World!\n");
+    printf("Hello World!\\n");
 }
 `;
 const language: Language = {
@@ -168,7 +168,7 @@ let tokens = lexer.parse(code);
 //console.log(tokens.map(r => `<${r.name} ${r.attribute}>`).join("\r\n"));
 let syntaxResult = new TopDownRecursiveAnalyser(syntax).analyse(tokens);
 const result = stringifySyntaxTree(syntaxResult.syntaxTree);
-//console.log(result);
+console.log(result);
 function printNonTerminal(nonTerminal: NonTerminal)
 {
     return nonTerminal.sequence.map(terminal =>
