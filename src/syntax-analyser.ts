@@ -8,13 +8,18 @@ interface SyntaxTreeNode
 }
 interface SyntaxTreeNonTerminalNode extends SyntaxTreeNode
 {
+    children: SyntaxTreeNode[];
     nonTerminal: Production;
-    production: ProductionGroup;
+    production?: ProductionGroup;
 }
 interface SyntaxTreeTerminalNode extends SyntaxTreeNode
 {
     terminal: TerminalUnit;
     token: LexToken;
+}
+interface SyntaxTreeEmptyNode extends SyntaxTreeNode
+{
+    empty: true;
 }
 interface SyntaxTree
 {
@@ -166,7 +171,12 @@ export class TopDownRecursiveAnalyser extends SyntaxAnalyser
         }
     }
 }
-
+interface ProductionState
+{
+    production: Production;
+    node: SyntaxTreeNonTerminalNode;
+    idx: number;
+}
 export class LL1Analyser extends SyntaxAnalyser
 {
     predictionTable: PredictionTable;
@@ -177,9 +187,76 @@ export class LL1Analyser extends SyntaxAnalyser
     }
     analyse(tokens: LexToken[], entry?: string): SyntaxAnalyseResult
     {
-        throw new Error("Method not implemented.");
+        if (this.syntax.productions.get(entry).productions.length > 1)
+            throw new Error("Entry production must be unique");
+        const reader = new TokenReader(tokens);
+        return this.analyseInternal(reader, entry);
     }
-    
+    private analyseInternal(tokens: TokenReader, entry?: string): SyntaxAnalyseResult
+    {
+        const stack: ProductionState[] = [{
+            production: this.syntax.productions.get(entry).productions[0],
+            idx: 0,
+            node: <SyntaxTreeNonTerminalNode>{
+                nonTerminal: this.syntax.productions.get(entry).productions[0],
+                children:[]
+            }
+        }];
+        while (stack.length > 0)
+        {
+            let state = stack[stack.length - 1];
+            for (let i = state.idx; i < state.production.body.length; i++)
+            {
+                const symbol = state.production.body[i];
+                if (symbol.empty)
+                    state.node.children.push(<SyntaxTreeEmptyNode>{ empty: true });
+                else if (symbol.tokenName)
+                {
+                    if (tokens.next.name !== symbol.tokenName)
+                        throw new Error(`Unexpect token '${tokens.next}' in production ${stringifyProduction(state.production)}`);
+                    state.node.children.push(<SyntaxTreeTerminalNode>{
+                        terminal: symbol,
+                        token: tokens.take()
+                    });
+                }
+                else if (symbol.productionName)
+                {
+                    const next = this.predictionTable.get(state.production.name, tokens.next.name);
+                    if (!next)
+                        throw new Error(`Unexpect token '${tokens.next}' in production ${stringifyProduction(state.production)}`);
+                    state.idx = i + 1;
+                    stack.push({
+                        idx: 0,
+                        node: <SyntaxTreeNonTerminalNode>{
+                            children: [],
+                            nonTerminal: next
+                        },
+                        production: next
+                    });
+                    break;
+                }
+                else
+                    throw new Error(`Unexpect symbol in production ${stringifyProduction(state.production)}`);
+                
+                if (i === state.production.body.length - 1)
+                {
+                    const node = state.node;
+                    stack.pop();
+                    if (stack.length === 0)
+                        return {
+                            syntaxTree: {
+                                root: <SyntaxTreeNonTerminalNode>node,
+                                syntax: this.syntax
+                            },
+                            diagnostics: []
+                        };
+                    state = stack[stack.length - 1];
+                    state.node.children.push(node);
+                    break;
+                }
+            }
+        }
+    }
 }
 /*
 function first(token: LexToken, production: Production, syntax:Syntax):NonTerminal[]

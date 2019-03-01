@@ -113,6 +113,16 @@ export class TokenReader
             };
         return this.tokens[this.currentIdx];
     }
+    get next(): LexToken
+    {
+        if (this.currentIdx + 1 >= this.tokens.length)
+            return {
+                eof: true,
+                attribute: null,
+                name: "$",
+            };
+        return this.tokens[this.currentIdx + 1];
+    }
     get eof()
     {
         return this.currentIdx >= this.tokens.length;
