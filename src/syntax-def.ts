@@ -13,10 +13,6 @@ export interface TerminalUnit
     empty?: boolean;
     eof?: boolean;
 }
-export class EmptyTerminal implements TerminalUnit
-{
-    empty: true = true;
-}
 export class EOFTerminal implements TerminalUnit
 {
     eof: true = true;
@@ -29,6 +25,14 @@ export class Terminal implements TerminalUnit
         this.tokenName = name;
     }
 }
+export class EmptyTerminal extends Terminal
+{
+    empty: true = true;
+    constructor()
+    {
+        super(undefined);
+    }
+}
 export class NonTerminalUnit implements TerminalUnit
 {
     productionName: string;
@@ -37,25 +41,25 @@ export class NonTerminalUnit implements TerminalUnit
         this.productionName = name;
     }
 }
-export interface NonTerminal
-{
-    sequence: TerminalUnit[];
-}
 export interface Production
 {
+    body: TerminalUnit[];
+}
+export interface ProductionGroup
+{
     name: string;
-    group: NonTerminal[];
+    productions: Production[];
 }
 export class Syntax
 {
     entry: string;
-    productions: Map<string, Production> = new Map();
+    productions: Map<string, ProductionGroup> = new Map();
 
     toString()
     {
         return Array.from(this.productions.values()).map(
-            production => `<${production.name}> ::= ${production.group.map(
-                nonTerminal => nonTerminal.sequence.map(
+            production => `<${production.name}> ::= ${production.productions.map(
+                nonTerminal => nonTerminal.body.map(
                     terminal => terminal.empty
                         ? "<>"
                         : terminal.productionName
@@ -96,8 +100,8 @@ export function compileSyntax(syntax: SyntaxDef, entry?: string): Syntax
 function checkSyntax(syntax: Syntax)
 {
     syntax.productions.forEach(
-        p => p.group.forEach(
-            nt => nt.sequence.forEach(
+        p => p.productions.forEach(
+            nt => nt.body.forEach(
                 t =>
                 {
                     if (t.productionName && !syntax.productions.has(t.productionName))
@@ -105,17 +109,17 @@ function checkSyntax(syntax: Syntax)
                 }
     )));
 }
-export function compileProduction(name: string, text: string): Production
+export function compileProduction(name: string, text: string): ProductionGroup
 {
     return {
         name: name,
-        group: text.split(/(?<!\\)\|/).map(t => compileNonTerminal(t)),
+        productions: text.split(/(?<!\\)\|/).map(t => compileNonTerminal(t)),
     };
 }
-export function compileNonTerminal(text: string): NonTerminal
+export function compileNonTerminal(text: string): Production
 {
     return {
-        sequence: new Lexer(syntaxDefLanguage).parse(text).map(token =>
+        body: new Lexer(syntaxDefLanguage).parse(text).map(token =>
         {
             token.attribute = token.attribute.replace(/\\\|/g, "|");
             let output: TerminalUnit = {
@@ -164,23 +168,23 @@ export function concatTerminals(...sequences: TerminalUnit[][])
     }
     return total;
 }
-export function compressProduction(p1: Production, p2: Production): Production
+export function compressProduction(p1: ProductionGroup, p2: ProductionGroup): ProductionGroup
 {
-    let group: NonTerminal[] = [];
-    p1.group.forEach(
+    let group: Production[] = [];
+    p1.productions.forEach(
         nt1 =>
         {
-            if (nt1.sequence[0].productionName === p2.name)
+            if (nt1.body[0].productionName === p2.name)
             {
-                group = group.concat(p2.group.map(nt2 => <NonTerminal>{
-                    sequence: concatTerminals(nt2.sequence,linq.from(nt1.sequence).skip(1).toArray())
+                group = group.concat(p2.productions.map(nt2 => <Production>{
+                    body: concatTerminals(nt2.body,linq.from(nt1.body).skip(1).toArray())
                 }))
             }
             else
                 group.push(nt1);
         });
     return {
-        group: group,
+        productions: group,
         name: p1.name
     };
 }
@@ -193,8 +197,8 @@ export function preventLeftRecursive(syntax: Syntax)
         {
             for (let j = 0; j < i; j++)
             {
-                if (productions[j].group.some(nt => nt.sequence[0].productionName == productions[i].name))
-                    productions[i].group = compressProduction(productions[i], productions[j]).group;
+                if (productions[j].productions.some(nt => nt.body[0].productionName == productions[i].name))
+                    productions[i].productions = compressProduction(productions[i], productions[j]).productions;
             }
             let [production, subProduction] = preventInstantLeftRecursive(syntax, productions[i]);
             productions[i] = production;
@@ -208,35 +212,35 @@ export function preventLeftRecursive(syntax: Syntax)
         }
     }
 }
-export function preventInstantLeftRecursive(syntax: Syntax, production: Production): [Production, Production]
+export function preventInstantLeftRecursive(syntax: Syntax, production: ProductionGroup): [ProductionGroup, ProductionGroup]
 {
-    let leftRecursiveGroup = production.group.filter(nonTerminal => nonTerminal.sequence[0].productionName === production.name);
-    let nonLeftRecursiveGroup = production.group.filter(nonTerminal => nonTerminal.sequence[0].productionName !== production.name);
+    let leftRecursiveGroup = production.productions.filter(nonTerminal => nonTerminal.body[0].productionName === production.name);
+    let nonLeftRecursiveGroup = production.productions.filter(nonTerminal => nonTerminal.body[0].productionName !== production.name);
     if (leftRecursiveGroup.length > 0)
     {
         let id = 1;
         while (syntax.productions.has(`${production.name}-${id}`))
             id++;
         let subName = `${production.name}-${id}`;
-        let subProduction: Production = {
+        let subProduction: ProductionGroup = {
             name: subName,
-            group: leftRecursiveGroup.map(
-                nt => <NonTerminal>{
-                    sequence: concatTerminals(linq
-                        .from(nt.sequence)
+            productions: leftRecursiveGroup.map(
+                nt => <Production>{
+                    body: concatTerminals(linq
+                        .from(nt.body)
                         .skip(1)
                         .toArray(), [<TerminalUnit>{ productionName: subName }])
-                }).concat(<NonTerminal>{
-                    sequence: [<TerminalUnit>{ empty: true }]
+                }).concat(<Production>{
+                    body: [<TerminalUnit>{ empty: true }]
                 })
         };
         nonLeftRecursiveGroup = nonLeftRecursiveGroup.map(
-            nt => <NonTerminal>{
-                sequence: concatTerminals(nt.sequence,
+            nt => <Production>{
+                body: concatTerminals(nt.body,
                     [<TerminalUnit>{ productionName: subName }])
             });
         syntax.productions.set(subName, subProduction);
-        production.group = nonLeftRecursiveGroup;
+        production.productions = nonLeftRecursiveGroup;
         return [production, subProduction];
     }
     return [production, null];
@@ -256,22 +260,22 @@ interface TreeNode<T>
     element: T;
     children: TreeNode<T>[];
 }
-function removeLeftFactorProduction(production: Production, syntax: Syntax)
+function removeLeftFactorProduction(production: ProductionGroup, syntax: Syntax)
 {
     let tree: TreeNode<TerminalUnit> = {
         element: null,
         children: []
     };
-    production.group.forEach(rule =>
+    production.productions.forEach(rule =>
     {
         let p = tree;
-        for (let i = 0; i < rule.sequence.length; i++)
+        for (let i = 0; i < rule.body.length; i++)
         {
-            let idx = p.children.findIndex(t => terminalEqual(t.element, rule.sequence[i]));
+            let idx = p.children.findIndex(t => terminalEqual(t.element, rule.body[i]));
             if (idx < 0)
             {
                 p.children.push({
-                    element: rule.sequence[i],
+                    element: rule.body[i],
                     children: []
                 });
                 p = p.children[p.children.length - 1];
@@ -286,9 +290,9 @@ function removeLeftFactorProduction(production: Production, syntax: Syntax)
             children: []
         });
     });
-    production.group = tree.children.map(child => rebuildGrammerRule(child));
+    production.productions = tree.children.map(child => rebuildGrammerRule(child));
 
-    function rebuildGrammerRule(node: TreeNode<TerminalUnit>): NonTerminal
+    function rebuildGrammerRule(node: TreeNode<TerminalUnit>): Production
     {
         let sequence: TerminalUnit[] = [node.element];
         let p = node;
@@ -298,11 +302,11 @@ function removeLeftFactorProduction(production: Production, syntax: Syntax)
             if (!p.element.empty)
                 sequence.push(p.element);
         }
-        let group: NonTerminal[] = <NonTerminal[]>[].concat(...p.children.map(child => extractChildren(child)));
+        let group: Production[] = <Production[]>[].concat(...p.children.map(child => extractChildren(child)));
         let noEmpty = true;
-        group = group.filter(g => g.sequence[0].empty ? noEmpty = false : true);
+        group = group.filter(g => g.body[0].empty ? noEmpty = false : true);
         if (!noEmpty)
-            group.push({sequence:[new EmptyTerminal()]});
+            group.push({body:[new EmptyTerminal()]});
         if (group.length > 0)
         {
             let id = 1;
@@ -311,19 +315,19 @@ function removeLeftFactorProduction(production: Production, syntax: Syntax)
             let subName = `${production.name}-${id}`;
             syntax.productions.set(subName, {
                 name: subName,
-                group: group
+                productions: group
             });
             sequence.push(new NonTerminalUnit(subName));
         }
-        return { sequence: sequence };
+        return { body: sequence };
     }
-    function extractChildren(node: TreeNode<TerminalUnit>): NonTerminal[]
+    function extractChildren(node: TreeNode<TerminalUnit>): Production[]
     {
         if (node.children.length <= 0)
         {
             return [
                 {
-                    sequence: [node.element]
+                    body: [node.element]
                 }
             ];
         }
@@ -332,19 +336,19 @@ function removeLeftFactorProduction(production: Production, syntax: Syntax)
             return [].concat(...node.children.map(child =>
             {
                 let children = linq.from(extractChildren(child))
-                    .where(t => t.sequence.length > 0)
-                    .where(t => !t.sequence[0].empty)
-                    .select(t => t.sequence)
+                    .where(t => t.body.length > 0)
+                    .where(t => !t.body[0].empty)
+                    .select(t => t.body)
                     .toArray();
                     //extractChildren(child).filter(t => t.sequence.length > 0 && !t.sequence[0].empty).map(t => t.sequence);
 
                 if (children.length <= 0)
-                    return [<NonTerminal>{
-                        sequence: [node.element]
+                    return [<Production>{
+                        body: [node.element]
                     }];
 
-                return children.map(s => <TerminalUnit>{
-                    sequence: [node.element].concat(...s)
+                return children.map(s => <Production>{
+                    body: [node.element].concat(...s)
                 });
             }));
         }

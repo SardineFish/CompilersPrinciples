@@ -1,4 +1,4 @@
-import { Syntax, Production, NonTerminal, TerminalUnit, Terminal, EmptyTerminal, NonTerminalUnit, EOFTerminal, terminalEqual, terminalStringify} from "./syntax-def";
+import { Syntax, ProductionGroup, Production, TerminalUnit, Terminal, EmptyTerminal, NonTerminalUnit, EOFTerminal, terminalEqual, terminalStringify} from "./syntax-def";
 import { LexToken, TokenReader } from "./lexer";
 import linq from "linq";
 
@@ -8,8 +8,8 @@ interface SyntaxTreeNode
 }
 interface SyntaxTreeNonTerminalNode extends SyntaxTreeNode
 {
-    nonTerminal: NonTerminal;
-    production: Production;
+    nonTerminal: Production;
+    production: ProductionGroup;
 }
 interface SyntaxTreeTerminalNode extends SyntaxTreeNode
 {
@@ -100,7 +100,7 @@ export class TopDownRecursiveAnalyser extends SyntaxAnalyser
         }
         return result;
     }
-    analyseNonTerminal(tokens: TokenReader, nonTerminal: NonTerminal)
+    analyseNonTerminal(tokens: TokenReader, nonTerminal: Production)
     {
         const current = tokens.current;
         const currentIdx = tokens.currentIdx;
@@ -109,14 +109,14 @@ export class TopDownRecursiveAnalyser extends SyntaxAnalyser
             production: null,
             children: []
         };
-        for (let i = 0; i < nonTerminal.sequence.length; i++)
+        for (let i = 0; i < nonTerminal.body.length; i++)
         {
-            const result = nonTerminal.sequence[i].empty
-                ? <SyntaxTreeTerminalNode>{ terminal: nonTerminal.sequence[i], token: null }
-                : nonTerminal.sequence[i].productionName
-                    ? this.analyseTopDown(tokens, this.syntax.productions.get(nonTerminal.sequence[i].productionName))
-                    : nonTerminal.sequence[i].tokenName === tokens.current.name
-                        ? <SyntaxTreeTerminalNode>{ terminal: nonTerminal.sequence[i], token: tokens.take() }
+            const result = nonTerminal.body[i].empty
+                ? <SyntaxTreeTerminalNode>{ terminal: nonTerminal.body[i], token: null }
+                : nonTerminal.body[i].productionName
+                    ? this.analyseTopDown(tokens, this.syntax.productions.get(nonTerminal.body[i].productionName))
+                    : nonTerminal.body[i].tokenName === tokens.current.name
+                        ? <SyntaxTreeTerminalNode>{ terminal: nonTerminal.body[i], token: tokens.take() }
                         : syntaxError();
             
             node.children.push(result);
@@ -128,7 +128,7 @@ export class TopDownRecursiveAnalyser extends SyntaxAnalyser
             return null;
         }
     }
-    analyseTopDown(tokens: TokenReader, production: Production): SyntaxTreeNonTerminalNode
+    analyseTopDown(tokens: TokenReader, production: ProductionGroup): SyntaxTreeNonTerminalNode
     {
         const current = tokens.current;
         const currentIdx = tokens.currentIdx;
@@ -208,13 +208,13 @@ export function first(unit: Production | TerminalUnit, syntax: Syntax): Terminal
     else if ((unit as Terminal).tokenName)
         return [(unit as Terminal)];
 }*/
-export function startWith(token: LexToken, production: Production, syntax:Syntax): SpecificProduction[]
+export function startWith(token: LexToken, production: ProductionGroup, syntax:Syntax): SpecificProduction[]
 {
-    return linq.from(production.group)
-        .where(nt => first(nt.sequence, syntax).some(t =>t.empty || t.tokenName === token.name))
+    return linq.from(production.productions)
+        .where(nt => first(nt.body, syntax).some(t =>t.empty || t.tokenName === token.name))
         .select(nt => <SpecificProduction>{
             name: production.name,
-            sequence: nt.sequence
+            body: nt.body
         }).toArray();
 }
 export function first(sequence: TerminalUnit[], syntax: Syntax): TerminalUnit[]
@@ -224,7 +224,7 @@ export function first(sequence: TerminalUnit[], syntax: Syntax): TerminalUnit[]
     let result: TerminalUnit[] = [];
     for (let i = 0; i < sequence.length; i++)
     {
-        let FIRSTi = <TerminalUnit[]>[].concat(...syntax.productions.get(sequence[i].productionName).group.map(nt => first(nt.sequence, syntax)));
+        let FIRSTi = <TerminalUnit[]>[].concat(...syntax.productions.get(sequence[i].productionName).productions.map(nt => first(nt.body, syntax)));
         result = result.concat(...FIRSTi);
         if (FIRSTi.every(t => !t.empty))
             break;
@@ -250,22 +250,22 @@ function followInternal(unit: TerminalUnit, syntax: Syntax, visited: Map<string,
     }
     syntax.productions.forEach((production, name) =>
     {
-        production.group.forEach(nt =>
+        production.productions.forEach(nt =>
         {
-            for (let i = 0; i < nt.sequence.length; i++)
+            for (let i = 0; i < nt.body.length; i++)
             {
-                if (terminalEqual(nt.sequence[i], unit))
+                if (terminalEqual(nt.body[i], unit))
                 {
                     // Exist <name> ::= <...any> <unit>
-                    if (i + 1 >= nt.sequence.length)
+                    if (i + 1 >= nt.body.length)
                         output = output.concat(...followInternal(new NonTerminalUnit(name), syntax, visited));
                     else
                     {
                         // Exist <name> ::= <...any> <unit> <f> with empty terminal in first(f)
-                        if (first([nt.sequence[i + 1]], syntax).some(t => t.empty))
+                        if (first([nt.body[i + 1]], syntax).some(t => t.empty))
                             output = output.concat(...followInternal(new NonTerminalUnit(name), syntax, visited));
 
-                        output = output.concat(...first([nt.sequence[i + 1]], syntax).filter(t => !t.empty));
+                        output = output.concat(...first([nt.body[i + 1]], syntax).filter(t => !t.empty));
                     }
                 }
             }
@@ -276,19 +276,19 @@ function followInternal(unit: TerminalUnit, syntax: Syntax, visited: Map<string,
 interface SpecificProduction
 {
     name: string;
-    sequence: TerminalUnit[];
+    body: TerminalUnit[];
 }
 function equalSpecificProduction(p1: SpecificProduction, p2: SpecificProduction)
 {
     return p1.name === p2.name
-        && p1.sequence.length === p2.sequence.length
-        && p1.sequence.every((t, idx) => terminalStringify(t) === terminalStringify(p2.sequence[idx]));
+        && p1.body.length === p2.body.length
+        && p1.body.every((t, idx) => terminalStringify(t) === terminalStringify(p2.body[idx]));
 }
 function stringifySpecificProduction(p: SpecificProduction)
 {
     if (!p)
         return "";
-    return `${p.name} ::= ${p.sequence.map(t => terminalStringify(t)).join(" ")}`;
+    return `${p.name} ::= ${p.body.map(t => terminalStringify(t)).join(" ")}`;
 }
 function fixSpace(text: string, space: number)
 {
@@ -344,19 +344,19 @@ export function generatePredictionMap(syntax: Syntax, allowAmbiguous: boolean = 
     map.allowAmbiguous = allowAmbiguous;
     syntax.productions.forEach((production, name) =>
     {
-        production.group.forEach(
+        production.productions.forEach(
             nt =>
             {
-                const headers = first(nt.sequence, syntax);
+                const headers = first(nt.body, syntax);
                 headers.filter(t => !t.empty).forEach(t => map.set(name, t.tokenName, {
                     name: name,
-                    sequence: nt.sequence
+                    body: nt.body
                 }));
                 if (headers.some(t => t.empty))
                 {
                     follow(new NonTerminalUnit(name), syntax).forEach(t => map.set(name, t.eof ? "$" : t.tokenName, {
                         name: name,
-                        sequence: nt.sequence
+                        body: nt.body
                     }));
                 }
             }

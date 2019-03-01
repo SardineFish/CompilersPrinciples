@@ -42,7 +42,7 @@ describe("Testing syntax analyser", () =>
             };
             const syntax = compileSyntax(syntaxDef);
             preventLeftRecursive(syntax);
-            const result = first(syntax.productions.get("expr").group[0].sequence, syntax);
+            const result = first(syntax.productions.get("expr").productions[0].body, syntax);
             const expect = [
                 { tokenName: "number" },
                 { tokenName: "id" },
@@ -61,7 +61,7 @@ describe("Testing syntax analyser", () =>
             };
             const syntax = compileSyntax(syntaxDef);
             preventLeftRecursive(syntax);
-            const result = first(syntax.productions.get("S").group[0].sequence, syntax);
+            const result = first(syntax.productions.get("S").productions[0].body, syntax);
             expect(result).to.have.deep.members([
                 { tokenName: "a" },
                 { tokenName: "b" },

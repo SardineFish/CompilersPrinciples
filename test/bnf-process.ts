@@ -1,4 +1,4 @@
-import { compileSyntax, SyntaxDef, preventLeftRecursive, NonTerminalUnit, Terminal, terminalStringify, removeLeftFactor, Syntax, NonTerminal } from "../src/syntax-def";
+import { compileSyntax, SyntaxDef, preventLeftRecursive, NonTerminalUnit, Terminal, terminalStringify, removeLeftFactor, Syntax, Production } from "../src/syntax-def";
 import { Language, simpleLexPattern, Lexer } from "../src/lexer";
 import { TopDownRecursiveAnalyser, stringifySyntaxTree } from "../src/syntax-analyser";
 
@@ -169,9 +169,9 @@ let tokens = lexer.parse(code);
 let syntaxResult = new TopDownRecursiveAnalyser(syntax).analyse(tokens);
 const result = stringifySyntaxTree(syntaxResult.syntaxTree);
 console.log(result);
-function printNonTerminal(nonTerminal: NonTerminal)
+function printNonTerminal(nonTerminal: Production)
 {
-    return nonTerminal.sequence.map(terminal =>
+    return nonTerminal.body.map(terminal =>
         terminal.empty
             ? '""'
             : terminal.productionName
@@ -181,6 +181,6 @@ function printNonTerminal(nonTerminal: NonTerminal)
 function printSyntax(syntax: Syntax)
 {
     for (const value of syntax.productions.values()) {
-        console.log(`<${value.name}> ::= ${value.group.map(nt => printNonTerminal(nt)).join(" | ")}`);
+        console.log(`<${value.name}> ::= ${value.productions.map(nt => printNonTerminal(nt)).join(" | ")}`);
     }
 }
