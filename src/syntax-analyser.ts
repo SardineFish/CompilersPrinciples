@@ -393,54 +393,49 @@ function fixSpace(text: string, space: number)
 }
 export class PredictionTable
 {
-    map: { [key: string]: { [key: string]: Production } } = {};
+    table: { [key: string]: { [key: string]: Production } } = {};
     productions: string[] = [];
+    
     //terminals: string[] = [];
     set(productionName: string, tokenName: string, value: Production):void
     set(productionName: string, terminal: Terminal, value: Production):void
     set(productionName: string, terminal: string|Terminal, value: Production):void
     {
-        if (!this.map[productionName])
+        if (!this.table[productionName])
         {
-            this.map[productionName] = {};
+            this.table[productionName] = {};
             this.productions.push(productionName);
         }
-        if (typeof (terminal) === "string")
+        if (typeof (terminal) !== "string")
         {
-            if (this.map[productionName][terminal] && this.map[productionName][terminal] !== value && !this.map[productionName][terminal].body[0].empty)
-                throw Error(`Ambiguous syntax in production '${productionName}' when accept token '${terminal}'.`);
-            this.map[productionName][terminal] = value;
+            if (terminal.eof)
+                terminal = "$";
+            else if (terminal.empty)
+                throw new Error("Unexpect empty terminal.");
+            else
+                terminal = terminal.tokenName;
         }
-        else if (terminal.eof)
+        
+        if (this.table[productionName][terminal])
         {
-            terminal = "$";
-            if (this.map[productionName][terminal] && this.map[productionName][terminal] !== value && !this.map[productionName][terminal].body[0].empty)
+            if (value.body[0].empty)
+                return;
+            else if (this.table[productionName][terminal] !== value && !this.table[productionName][terminal].body[0].empty)
                 throw Error(`Ambiguous syntax in production '${productionName}' when accept token '${terminal}'.`);
-            this.map[productionName][terminal] = value;
         }
-        else if (terminal.empty)
-            throw new Error("Unexpect empty terminal.");
-        else if (terminal.tokenName)
-        {
-            terminal = terminal.tokenName;
-            if (this.map[productionName][terminal] && this.map[productionName][terminal] !== value && !this.map[productionName][terminal].body[0].empty)
-                throw Error(`Ambiguous syntax in production '${productionName}' when accept token '${terminal}'.`);
-            this.map[productionName][terminal] = value;
-        }
-        else
-            throw new Error("Invalid terminal.");
+        this.table[productionName][terminal] = value;
     }
     get(productionName: string, tokenName: string): Production
     {
-        if (!this.map[productionName] || !this.map[productionName][tokenName])
+        if (!this.table[productionName] || !this.table[productionName][tokenName])
             return null;
-        return this.map[productionName][tokenName];
+        return this.table[productionName][tokenName];
     }
     toString(): string
     {
-        return `{\r\n${Object.keys(this.map).map(k1 => `    ${k1}: {\r\n${
-            Object.keys(this.map[k1]).map(
-                k2 => `        ${k2}: <${this.map[k1][k2].name}>::=${this.map[k1][k2].body.map(
+        return `{\r\n${Object.keys(this.table).map(k1 => `    ${k1}: {\r\n${
+            Object.keys(this.table[k1]).map(
+                k2 => `        ${k2}: <${this.table[k1][k2].name}>::=${this.table[k1][k2].body.map(
                     unit => unit.empty
                         ? '""'
                         : unit.productionName

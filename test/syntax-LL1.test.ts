@@ -22,5 +22,17 @@ describe("LL(1) Analyser Test", () =>
             const analyser = new LL1Analyser(syntax);
             //console.log(analyser.predictionTable.toString());
         });
+
+        it("Ambiguous syntax", async () =>
+        {
+            const syntaxDef: SyntaxDef = {
+                "statement": "'if' <expr> 'then' <statement> <statement-1> | 'other'",
+                "statement-1": "'else' <statement> | <>",
+                "expr": "'expr'"
+            };
+            const syntax = compileSyntax(syntaxDef, "statement");
+            const analyser = new LL1Analyser(syntax);
+            console.log(analyser.predictionTable.toString());
+        });
     });
 });
