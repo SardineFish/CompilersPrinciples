@@ -211,33 +211,92 @@ export function first(unit: Production | TerminalUnit, syntax: Syntax): Terminal
 export function startWith(token: LexToken, production: ProductionGroup, syntax:Syntax): SpecificProduction[]
 {
     return linq.from(production.productions)
-        .where(nt => first(nt.body, syntax).some(t =>t.empty || t.tokenName === token.name))
+        .where(nt => first_Legacy(nt.body, syntax).some(t =>t.empty || t.tokenName === token.name))
         .select(nt => <SpecificProduction>{
             name: production.name,
             body: nt.body
         }).toArray();
 }
-export function first(sequence: TerminalUnit[], syntax: Syntax): TerminalUnit[]
+export function firstSet(symbol: TerminalUnit, syntax: Syntax): Terminal[]
+{
+    if (symbol.empty || symbol.tokenName)
+        return [symbol as Terminal];
+    if (!symbol.productionName)
+        throw new Error("Unknown production symbol.");
+    if (!syntax.productions.has(symbol.productionName))
+        throw Error(`Production <${symbol.productionName}> not found.`);
+    return [].concat(...syntax.productions.get(symbol.productionName).productions.map(p => firstSetInProduction(p, syntax)));
+}
+function firstSetInProduction(production: Production, syntax: Syntax): Terminal[]
+{
+    // <A> ::= "" or <A> ::= "a"...
+    if (production.body[0].empty || production.body[0].tokenName)
+        return [production.body[0] as Terminal];
+
+    let result: Terminal[] = [];
+    for (let i = 0; i < production.body.length; i++)
+    {
+        let firstI:Terminal[] = [].concat(...firstSet(production.body[i], syntax));
+        result = [...result, ...firstI];
+        if (!firstI.some(t => t.empty))
+            break;
+    }
+    return linq.from(result).distinct(terminalStringify).toArray();
+}
+
+export function first_Legacy(sequence: TerminalUnit[], syntax: Syntax): TerminalUnit[]
 {
     if (sequence[0].empty || sequence[0].tokenName)
         return [sequence[0]];
     let result: TerminalUnit[] = [];
     for (let i = 0; i < sequence.length; i++)
     {
-        let FIRSTi = <TerminalUnit[]>[].concat(...syntax.productions.get(sequence[i].productionName).productions.map(nt => first(nt.body, syntax)));
+        let FIRSTi = <TerminalUnit[]>[].concat(...syntax.productions.get(sequence[i].productionName).productions.map(nt => first_Legacy(nt.body, syntax)));
         result = result.concat(...FIRSTi);
         if (FIRSTi.every(t => !t.empty))
             break;
     }
     return linq.from(result).distinct(terminalStringify).toArray();
 }
-
-export function follow(unit: TerminalUnit, syntax: Syntax): TerminalUnit[]
+export function followSet(productionName: string, syntax: Syntax): Terminal[]
 {
-    return linq.from(followInternal(unit, syntax, new Map())).distinct(terminalStringify).toArray();
+    return linq.from(followSetRecursive(productionName, syntax, new Map())).distinct(terminalStringify).toArray();
+}
+function followSetRecursive(productionName: string, syntax: Syntax, visited: Map<string, true>): Terminal[]
+{
+    if (visited.has(productionName))
+        return [];
+    visited.set(productionName, true);
+
+    let set: Terminal[] = [];
+    if (productionName === syntax.entry)
+        set.push(new EOFTerminal());
+
+
+    syntax.productions.forEach((group, name) =>
+    {
+        group.productions.forEach(production =>
+        {
+            production.body.forEach((symbol, idx) =>
+            {
+                if (symbol.productionName === productionName)
+                {
+                    if (idx + 1 >= production.body.length)
+                        set = [...set, ...followSetRecursive(group.name, syntax, visited)];
+                    else
+                        set = [...set, ...firstSet(production.body[idx + 1], syntax).filter(t => !t.empty)];
+                }    
+            });
+        });
+    });
+    return set;
+}
+export function follow_Legacy(unit: TerminalUnit, syntax: Syntax): TerminalUnit[]
+{
+    return linq.from(follow_Legacy_Internal(unit, syntax, new Map())).distinct(terminalStringify).toArray();
 }
 
-function followInternal(unit: TerminalUnit, syntax: Syntax, visited: Map<string, true>)
+function follow_Legacy_Internal(unit: TerminalUnit, syntax: Syntax, visited: Map<string, true>)
 {
     let output: TerminalUnit[] = [];
     if (visited.get(terminalStringify(unit)))
@@ -258,14 +317,14 @@ function followInternal(unit: TerminalUnit, syntax: Syntax, visited: Map<string,
                 {
                     // Exist <name> ::= <...any> <unit>
                     if (i + 1 >= nt.body.length)
-                        output = output.concat(...followInternal(new NonTerminalUnit(name), syntax, visited));
+                        output = output.concat(...follow_Legacy_Internal(new NonTerminalUnit(name), syntax, visited));
                     else
                     {
                         // Exist <name> ::= <...any> <unit> <f> with empty terminal in first(f)
-                        if (first([nt.body[i + 1]], syntax).some(t => t.empty))
-                            output = output.concat(...followInternal(new NonTerminalUnit(name), syntax, visited));
+                        if (first_Legacy([nt.body[i + 1]], syntax).some(t => t.empty))
+                            output = output.concat(...follow_Legacy_Internal(new NonTerminalUnit(name), syntax, visited));
 
-                        output = output.concat(...first([nt.body[i + 1]], syntax).filter(t => !t.empty));
+                        output = output.concat(...first_Legacy([nt.body[i + 1]], syntax).filter(t => !t.empty));
                     }
                 }
             }
@@ -347,14 +406,14 @@ export function generatePredictionMap(syntax: Syntax, allowAmbiguous: boolean = 
         production.productions.forEach(
             nt =>
             {
-                const headers = first(nt.body, syntax);
+                const headers = first_Legacy(nt.body, syntax);
                 headers.filter(t => !t.empty).forEach(t => map.set(name, t.tokenName, {
                     name: name,
                     body: nt.body
                 }));
                 if (headers.some(t => t.empty))
                 {
-                    follow(new NonTerminalUnit(name), syntax).forEach(t => map.set(name, t.eof ? "$" : t.tokenName, {
+                    follow_Legacy(new NonTerminalUnit(name), syntax).forEach(t => map.set(name, t.eof ? "$" : t.tokenName, {
                         name: name,
                         body: nt.body
                     }));

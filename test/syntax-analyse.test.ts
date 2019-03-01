@@ -1,7 +1,7 @@
 import { compileSyntax, SyntaxDef, preventLeftRecursive, NonTerminalUnit, Terminal, terminalStringify, removeLeftFactor} from "../src/syntax-def";
 import assert from "assert";
 import { expect } from "chai";
-import { first, follow, generatePredictionMap, TopDownRecursiveAnalyser, stringifySyntaxTree } from "../src/syntax-analyser";
+import { first_Legacy, follow_Legacy, generatePredictionMap, TopDownRecursiveAnalyser, stringifySyntaxTree, firstSet, followSet } from "../src/syntax-analyser";
 import { Language, simpleLexPattern, Lexer } from "../src/lexer";
 import fs from "fs";
 import Path from "path";
@@ -42,7 +42,8 @@ describe("Testing syntax analyser", () =>
             };
             const syntax = compileSyntax(syntaxDef);
             preventLeftRecursive(syntax);
-            const result = first(syntax.productions.get("expr").productions[0].body, syntax);
+            //const result = first(syntax.productions.get("expr").productions[0].body, syntax);
+            const result = firstSet({ productionName: "expr" }, syntax);
             const expect = [
                 { tokenName: "number" },
                 { tokenName: "id" },
@@ -61,7 +62,8 @@ describe("Testing syntax analyser", () =>
             };
             const syntax = compileSyntax(syntaxDef);
             preventLeftRecursive(syntax);
-            const result = first(syntax.productions.get("S").productions[0].body, syntax);
+            //const result = first(syntax.productions.get("S").productions[0].body, syntax);
+            const result = firstSet({ productionName: "S" }, syntax);
             expect(result).to.have.deep.members([
                 { tokenName: "a" },
                 { tokenName: "b" },
@@ -70,7 +72,7 @@ describe("Testing syntax analyser", () =>
             ]);
         });
     });
-
+/*
     it("Set FOLLOW", () =>
     {
         const syntaxDef: SyntaxDef = {
@@ -80,6 +82,8 @@ describe("Testing syntax analyser", () =>
         };
         const syntax = compileSyntax(syntaxDef);
         preventLeftRecursive(syntax);
+        //console.log(syntax.toString());
+        //console.log(followSet("factor", syntax));
 
         expect(follow(new Terminal("number"), syntax).map(terminalStringify))
             .to.have.members(['"$"', '"+"', '"-"', '"*"', '"/"', '")"'])
@@ -93,6 +97,31 @@ describe("Testing syntax analyser", () =>
             .to.have.members(['"number"', '"id"', '"("'])
             .but.not.have.members(['"$"', '"+"', '"-"', '"*"', '"/"', '")"']);
         //console.log(follow(new Terminal("number"), syntax));
+    });*/
+
+    it("Set FOLLOW", () =>
+    {
+        const syntaxDef: SyntaxDef = {
+            "S": "<A> <B> | <B> <A> <S> 'd'",
+            "A": "'a' | <>",
+            "B": "'b' 'c' 'd'",
+            "C": "'c' | <>",
+            "S2": "<D> <E> <F>",
+            "D": "'d' | <>",
+            "E": "'e' | <>",
+            "F": "'f'",
+            "statement": "'if' <expr> 'then' <statement> <statement-1> | 'other'",
+            "statement-1": "'else' <statement> | <>",
+            "expr": "'expr'"
+        };
+        const syntax = compileSyntax(syntaxDef, "S");
+        preventLeftRecursive(syntax);
+        expect(followSet("A", syntax).map(terminalStringify))
+            .have.members(['"b"', '"a"']);
+        expect(followSet("S", syntax).map(terminalStringify))
+            .have.members(['"$"', '"d"']);
+        expect(followSet("statement", syntax).map(terminalStringify))
+            .have.members(['"else"']);
     });
 
     it("Prediction table test", () =>

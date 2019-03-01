@@ -13,16 +13,23 @@ export interface TerminalUnit
     empty?: boolean;
     eof?: boolean;
 }
-export class EOFTerminal implements TerminalUnit
-{
-    eof: true = true;
-}
+
 export class Terminal implements TerminalUnit
 {
+    empty?: boolean;
+    eof?: boolean;
     tokenName: string;
     constructor(name: string)
     {
         this.tokenName = name;
+    }
+}
+export class EOFTerminal extends Terminal
+{
+    eof: true = true;
+    constructor()
+    {
+        super(undefined);
     }
 }
 export class EmptyTerminal extends Terminal
