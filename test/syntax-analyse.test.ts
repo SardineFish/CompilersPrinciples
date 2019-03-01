@@ -116,6 +116,7 @@ describe("Testing syntax analyser", () =>
         };
         const syntax = compileSyntax(syntaxDef, "S");
         preventLeftRecursive(syntax);
+        //console.log(firstSet({ productionName: "S" }, syntax));
         expect(followSet("A", syntax).map(terminalStringify))
             .have.members(['"b"', '"a"']);
         expect(followSet("S", syntax).map(terminalStringify))

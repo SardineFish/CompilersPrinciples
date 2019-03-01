@@ -169,7 +169,12 @@ export class TopDownRecursiveAnalyser extends SyntaxAnalyser
 
 export class LL1Analyser extends SyntaxAnalyser
 {
-
+    predictionTable: PredictionTable;
+    constructor(syntax:Syntax)
+    {
+        super(syntax);
+        this.predictionTable = generatePredictionTable(syntax);
+    }
     analyse(tokens: LexToken[], entry?: string): SyntaxAnalyseResult
     {
         throw new Error("Method not implemented.");
@@ -227,7 +232,7 @@ export function firstSet(symbol: TerminalUnit, syntax: Syntax): Terminal[]
         throw Error(`Production <${symbol.productionName}> not found.`);
     return [].concat(...syntax.productions.get(symbol.productionName).productions.map(p => firstSetInProduction(p, syntax)));
 }
-function firstSetInProduction(production: Production, syntax: Syntax): Terminal[]
+export function firstSetInProduction(production: Production, syntax: Syntax): Terminal[]
 {
     // <A> ::= "" or <A> ::= "a"...
     if (production.body[0].empty || production.body[0].tokenName)
@@ -237,9 +242,15 @@ function firstSetInProduction(production: Production, syntax: Syntax): Terminal[
     for (let i = 0; i < production.body.length; i++)
     {
         let firstI:Terminal[] = [].concat(...firstSet(production.body[i], syntax));
-        result = [...result, ...firstI];
+        result = [...result, ...firstI.filter(t=>!t.empty)];
         if (!firstI.some(t => t.empty))
             break;
+        
+        // <A> ::= <Y1><Y2>...<Yn> where all <Yi>::=""
+        if (i == production.body.length - 1)
+        {
+            result.push(new EmptyTerminal());
+        }
     }
     return linq.from(result).distinct(terminalStringify).toArray();
 }
@@ -277,6 +288,27 @@ function followSetRecursive(productionName: string, syntax: Syntax, visited: Map
     {
         group.productions.forEach(production =>
         {
+            for (let i = 0; i < production.body.length; i++)
+            {
+                const symbol = production.body[i];
+                if (symbol.productionName === productionName)
+                {
+                    let j: number;
+                    for (j = i + 1; j < production.body.length; j++)
+                    {
+                        const nextFirstSet = firstSet(production.body[j], syntax);
+                        set = [...set, ...nextFirstSet.filter(t => !t.empty)];
+                        if (!nextFirstSet.some(t => t.empty))
+                            break;
+                    }
+                    // <A> ::= ...<B><b1><b2>... where all <bi>::=""
+                    if (j == production.body.length)
+                    {
+                        set = [...set, ...followSetRecursive(group.name, syntax, visited)];
+                    }
+                }
+            }
+            /*
             production.body.forEach((symbol, idx) =>
             {
                 if (symbol.productionName === productionName)
@@ -284,9 +316,15 @@ function followSetRecursive(productionName: string, syntax: Syntax, visited: Map
                     if (idx + 1 >= production.body.length)
                         set = [...set, ...followSetRecursive(group.name, syntax, visited)];
                     else
-                        set = [...set, ...firstSet(production.body[idx + 1], syntax).filter(t => !t.empty)];
+                    {
+                        let nextFirstSet = firstSet(production.body[idx + 1], syntax);
+                        set = [...set, ...nextFirstSet.filter(t => !t.empty)];
+                        if (nextFirstSet.some(t => t.empty))
+                            set = [...set, ...followSet(name, syntax)];
+                            
+                    }
                 }    
-            });
+            });*/
         });
     });
     return set;
@@ -353,6 +391,63 @@ function fixSpace(text: string, space: number)
 {
     return `${text}${linq.repeat(" ", space - text.length).toArray().join("")}`;
 }
+export class PredictionTable
+{
+    map: { [key: string]: { [key: string]: Production } } = {};
+    productions: string[] = [];
+    //terminals: string[] = [];
+    set(productionName: string, tokenName: string, value: Production):void
+    set(productionName: string, terminal: Terminal, value: Production):void
+    set(productionName: string, terminal: string|Terminal, value: Production):void
+    {
+        if (!this.map[productionName])
+        {
+            this.map[productionName] = {};
+            this.productions.push(productionName);
+        }
+        if (typeof (terminal) === "string")
+        {
+            if (this.map[productionName][terminal] && this.map[productionName][terminal] !== value && !this.map[productionName][terminal].body[0].empty)
+                throw Error(`Ambiguous syntax in production '${productionName}' when accept token '${terminal}'.`);
+            this.map[productionName][terminal] = value;
+        }
+        else if (terminal.eof)
+        {
+            terminal = "$";
+            if (this.map[productionName][terminal] && this.map[productionName][terminal] !== value && !this.map[productionName][terminal].body[0].empty)
+                throw Error(`Ambiguous syntax in production '${productionName}' when accept token '${terminal}'.`);
+            this.map[productionName][terminal] = value;
+        }
+        else if (terminal.empty)
+            throw new Error("Unexpect empty terminal.");
+        else if (terminal.tokenName)
+        {
+            terminal = terminal.tokenName;
+            if (this.map[productionName][terminal] && this.map[productionName][terminal] !== value && !this.map[productionName][terminal].body[0].empty)
+                throw Error(`Ambiguous syntax in production '${productionName}' when accept token '${terminal}'.`);
+            this.map[productionName][terminal] = value;
+        }
+        else
+            throw new Error("Invalid terminal.");
+    }
+    get(productionName: string, tokenName: string): Production
+    {
+        if (!this.map[productionName] || !this.map[productionName][tokenName])
+            return null;
+        return this.map[productionName][tokenName];
+    }
+    toString(): string
+    {
+        return `{\r\n${Object.keys(this.map).map(k1 => `    ${k1}: {\r\n${
+            Object.keys(this.map[k1]).map(
+                k2 => `        ${k2}: <${this.map[k1][k2].name}>::=${this.map[k1][k2].body.map(
+                    unit => unit.empty
+                        ? '""'
+                        : unit.productionName
+                            ? `<${unit.productionName}>`
+                            : `"${unit.tokenName}"`).join(" ")}`).join(", \r\n")}}`).join("}, \r\n")}\r\n}`;
+    }
+}
 export class PredictionMap
 {
     map: Map<string, SpecificProduction[]> = new Map();
@@ -373,9 +468,9 @@ export class PredictionMap
         {
             this.map.set(keyM, [value]);
         }
-        if (!this.productions.includes(productionName))
+        if (this.productions.indexOf(productionName)<0)
             this.productions.push(productionName);
-        if (!this.terminals.includes(tokenName))
+        if (this.terminals.indexOf(tokenName)<0)
             this.terminals.push(tokenName);
         return this;
     }
@@ -395,6 +490,26 @@ export class PredictionMap
             ).join("")}`).join("\r\n")}`;
     }
 }
+
+export function generatePredictionTable(syntax: Syntax): PredictionTable
+{
+    const table: PredictionTable = new PredictionTable();
+    syntax.productions.forEach((group, name) =>
+    {
+        group.productions.forEach(production =>
+        {
+            const headers = firstSetInProduction(production, syntax);
+            headers.filter(t => !t.empty).forEach(t => table.set(name, t.tokenName, production));
+            if (headers.some(t => t.empty))
+            {
+                followSet(name, syntax).forEach(b => table.set(name, b, production));
+            }
+        });
+    });
+    return table;
+
+}
+
 export function generatePredictionMap(syntax: Syntax, allowAmbiguous: true): PredictionMap
 export function generatePredictionMap(syntax: Syntax): PredictionMap
 export function generatePredictionMap(syntax: Syntax, allowAmbiguous: boolean = false): PredictionMap

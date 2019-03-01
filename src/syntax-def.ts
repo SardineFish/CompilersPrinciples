@@ -30,6 +30,7 @@ export class EOFTerminal extends Terminal
     constructor()
     {
         super(undefined);
+        delete this.tokenName;
     }
 }
 export class EmptyTerminal extends Terminal
@@ -38,6 +39,7 @@ export class EmptyTerminal extends Terminal
     constructor()
     {
         super(undefined);
+        delete this.tokenName;
     }
 }
 export class NonTerminalUnit implements TerminalUnit
