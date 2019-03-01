@@ -387,6 +387,10 @@ function stringifySpecificProduction(p: SpecificProduction)
         return "";
     return `${p.name} ::= ${p.body.map(t => terminalStringify(t)).join(" ")}`;
 }
+function stringifyProduction(p: Production)
+{
+    return `${p.name} ::= ${p.body.map(t => terminalStringify(t)).join(" ")}`;
+}
 function fixSpace(text: string, space: number)
 {
     return `${text}${linq.repeat(" ", space - text.length).toArray().join("")}`;
@@ -421,7 +425,10 @@ export class PredictionTable
             if (value.body[0].empty)
                 return;
             else if (this.table[productionName][terminal] !== value && !this.table[productionName][terminal].body[0].empty)
-                throw Error(`Ambiguous syntax in production '${productionName}' when accept token '${terminal}'.`);
+                throw Error(`Ambiguous syntax in production '${productionName}' when accept token '${terminal}'.
+${stringifyProduction(this.table[productionName][terminal])}
+${stringifyProduction(value)}
+`);
         }
         this.table[productionName][terminal] = value;
     }

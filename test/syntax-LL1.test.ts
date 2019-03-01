@@ -1,7 +1,7 @@
 import { SyntaxDef, compileSyntax, preventLeftRecursive, removeLeftFactor } from "../src/syntax-def";
 import { expect } from "chai";
 import { generatePredictionMap, LL1Analyser, followSet, firstSet } from "../src/syntax-analyser";
-import { SyntaxDefAmbiguous } from "./const-lib";
+import { SyntaxDefAmbiguous, SyntaxDefCLike, SyntaxDefCLikeNoAmbiguous } from "./const-lib";
 
 describe("LL(1) Analyser Test", () =>
 {
@@ -75,6 +75,20 @@ describe("LL(1) Analyser Test", () =>
             expect(analyser.predictionTable.objectify())
                 .be.deep.equal(expectResult);
             
+        });
+
+        it("C-like syntax", async () =>
+        {
+            const syntax = compileSyntax(SyntaxDefCLikeNoAmbiguous, "syntax");
+            preventLeftRecursive(syntax);
+            removeLeftFactor(syntax);
+            //console.log(firstSet({ productionName: "signed-type" }, syntax));
+            //console.log(syntax.toString());
+            const f = () =>
+            {
+                return new LL1Analyser(syntax);
+            }
+            expect(f).not.throw();
         });
     });
 });
