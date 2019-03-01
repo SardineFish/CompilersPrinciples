@@ -43,6 +43,7 @@ export class NonTerminalUnit implements TerminalUnit
 }
 export interface Production
 {
+    name: string;
     body: TerminalUnit[];
 }
 export interface ProductionGroup
@@ -113,12 +114,13 @@ export function compileProduction(name: string, text: string): ProductionGroup
 {
     return {
         name: name,
-        productions: text.split(/(?<!\\)\|/).map(t => compileNonTerminal(t)),
+        productions: text.split(/(?<!\\)\|/).map(t => compileNonTerminal(t, name)),
     };
 }
-export function compileNonTerminal(text: string): Production
+export function compileNonTerminal(text: string, name: string): Production
 {
     return {
+        name: name,
         body: new Lexer(syntaxDefLanguage).parse(text).map(token =>
         {
             token.attribute = token.attribute.replace(/\\\|/g, "|");
@@ -226,16 +228,19 @@ export function preventInstantLeftRecursive(syntax: Syntax, production: Producti
             name: subName,
             productions: leftRecursiveGroup.map(
                 nt => <Production>{
+                    name: subName, 
                     body: concatTerminals(linq
                         .from(nt.body)
                         .skip(1)
                         .toArray(), [<TerminalUnit>{ productionName: subName }])
                 }).concat(<Production>{
+                    name: subName, 
                     body: [<TerminalUnit>{ empty: true }]
                 })
         };
         nonLeftRecursiveGroup = nonLeftRecursiveGroup.map(
             nt => <Production>{
+                name: production.name, 
                 body: concatTerminals(nt.body,
                     [<TerminalUnit>{ productionName: subName }])
             });
@@ -260,22 +265,22 @@ interface TreeNode<T>
     element: T;
     children: TreeNode<T>[];
 }
-function removeLeftFactorProduction(production: ProductionGroup, syntax: Syntax)
+function removeLeftFactorProduction(productionGroup: ProductionGroup, syntax: Syntax)
 {
     let tree: TreeNode<TerminalUnit> = {
         element: null,
         children: []
     };
-    production.productions.forEach(rule =>
+    productionGroup.productions.forEach(production =>
     {
         let p = tree;
-        for (let i = 0; i < rule.body.length; i++)
+        for (let i = 0; i < production.body.length; i++)
         {
-            let idx = p.children.findIndex(t => terminalEqual(t.element, rule.body[i]));
+            let idx = p.children.findIndex(t => terminalEqual(t.element, production.body[i]));
             if (idx < 0)
             {
                 p.children.push({
-                    element: rule.body[i],
+                    element: production.body[i],
                     children: []
                 });
                 p = p.children[p.children.length - 1];
@@ -290,9 +295,9 @@ function removeLeftFactorProduction(production: ProductionGroup, syntax: Syntax)
             children: []
         });
     });
-    production.productions = tree.children.map(child => rebuildGrammerRule(child));
+    productionGroup.productions = tree.children.map(child => rebuildGrammerRule(child, productionGroup.name));
 
-    function rebuildGrammerRule(node: TreeNode<TerminalUnit>): Production
+    function rebuildGrammerRule(node: TreeNode<TerminalUnit>, name: string): Production
     {
         let sequence: TerminalUnit[] = [node.element];
         let p = node;
@@ -302,31 +307,38 @@ function removeLeftFactorProduction(production: ProductionGroup, syntax: Syntax)
             if (!p.element.empty)
                 sequence.push(p.element);
         }
-        let group: Production[] = <Production[]>[].concat(...p.children.map(child => extractChildren(child)));
+        let group: Production[] = <Production[]>[].concat(...p.children.map(child => extractChildren(child, name)));
         let noEmpty = true;
         group = group.filter(g => g.body[0].empty ? noEmpty = false : true);
         if (!noEmpty)
-            group.push({body:[new EmptyTerminal()]});
+            group.push({
+                name: name, 
+                body: [new EmptyTerminal()]
+            });
         if (group.length > 0)
         {
             let id = 1;
-            while (syntax.productions.has(`${production.name}-${id}`))
+            while (syntax.productions.has(`${productionGroup.name}-${id}`))
                 id++;
-            let subName = `${production.name}-${id}`;
+            let subName = `${productionGroup.name}-${id}`;
             syntax.productions.set(subName, {
                 name: subName,
                 productions: group
             });
             sequence.push(new NonTerminalUnit(subName));
         }
-        return { body: sequence };
+        return {
+            name: name, 
+            body: sequence
+        };
     }
-    function extractChildren(node: TreeNode<TerminalUnit>): Production[]
+    function extractChildren(node: TreeNode<TerminalUnit>, name: string): Production[]
     {
         if (node.children.length <= 0)
         {
             return [
                 {
+                    name: name, 
                     body: [node.element]
                 }
             ];
@@ -335,7 +347,7 @@ function removeLeftFactorProduction(production: ProductionGroup, syntax: Syntax)
         {
             return [].concat(...node.children.map(child =>
             {
-                let children = linq.from(extractChildren(child))
+                let children = linq.from(extractChildren(child, name))
                     .where(t => t.body.length > 0)
                     .where(t => !t.body[0].empty)
                     .select(t => t.body)
@@ -344,10 +356,12 @@ function removeLeftFactorProduction(production: ProductionGroup, syntax: Syntax)
 
                 if (children.length <= 0)
                     return [<Production>{
+                        name: name, 
                         body: [node.element]
                     }];
 
                 return children.map(s => <Production>{
+                    name: name, 
                     body: [node.element].concat(...s)
                 });
             }));
