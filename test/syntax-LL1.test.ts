@@ -1,7 +1,9 @@
 import { SyntaxDef, compileSyntax, preventLeftRecursive, removeLeftFactor } from "../src/syntax-def";
 import { expect } from "chai";
-import { generatePredictionMap, LL1Analyser, followSet, firstSet } from "../src/syntax-analyser";
-import { SyntaxDefAmbiguous, SyntaxDefCLike, SyntaxDefCLikeNoAmbiguous } from "./const-lib";
+import { generatePredictionMap, LL1Analyser, followSet, firstSet, stringifySyntaxTree } from "../src/syntax-analyser";
+import { SyntaxDefAmbiguous, SyntaxDefCLike, SyntaxDefCLikeNoAmbiguous, SyntaxDefExpr, LanguageStatement, SyntaxDefSimpleStructure } from "./const-lib";
+import { fileTestCase } from "./lib";
+import { Language, simpleLexPattern, Lexer } from "../src/lexer";
 
 describe("LL(1) Analyser Test", () =>
 {
@@ -89,6 +91,43 @@ describe("LL(1) Analyser Test", () =>
                 return new LL1Analyser(syntax);
             }
             expect(f).not.throw();
+        });
+
+        describe("LL(1) analyse", async() =>
+        {
+            it("Expression", async () =>
+            {
+                const lexer = new Lexer(LanguageStatement);
+
+                const syntax = compileSyntax(SyntaxDefExpr, "expr");
+                preventLeftRecursive(syntax);
+                removeLeftFactor(syntax);
+                let analyser: LL1Analyser = new LL1Analyser(syntax);
+                await fileTestCase("test-code/expression", (input, ans) =>
+                {
+                    let tokens = lexer.parse(input);
+                    const result = analyser.analyse(tokens);
+                    //console.log(stringifySyntaxTree(result.syntaxTree));
+                    expect(stringifySyntaxTree(result.syntaxTree)).be.equal(ans);
+                });
+            });
+
+            it("Statement", async () =>
+            {
+                const lexer = new Lexer(LanguageStatement);
+                const syntax = compileSyntax(SyntaxDefSimpleStructure, "syntax");
+                preventLeftRecursive(syntax);
+                removeLeftFactor(syntax);
+                let analyser = new LL1Analyser(syntax);
+                
+                await fileTestCase("test-code/statement", (input, ans) =>
+                {
+                    let tokens = lexer.parse(input);
+                    const result = analyser.analyse(tokens);
+                    //console.log(stringifySyntaxTree(result.syntaxTree));
+                    expect(stringifySyntaxTree(result.syntaxTree)).be.equal(ans);
+                });
+            });
         });
     });
 });

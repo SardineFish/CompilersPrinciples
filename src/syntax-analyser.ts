@@ -9,15 +9,15 @@ interface SyntaxTreeNode
 interface SyntaxTreeNonTerminalNode extends SyntaxTreeNode
 {
     children: SyntaxTreeNode[];
-    nonTerminal: Production;
-    production?: ProductionGroup;
+    production: Production;
 }
 interface SyntaxTreeTerminalNode extends SyntaxTreeNode
 {
-    terminal: TerminalUnit;
-    token: LexToken;
+    empty?: boolean;
+    terminal?: TerminalUnit;
+    token?: LexToken;
 }
-interface SyntaxTreeEmptyNode extends SyntaxTreeNode
+interface SyntaxTreeEmptyNode extends SyntaxTreeTerminalNode
 {
     empty: true;
 }
@@ -51,7 +51,7 @@ export function stringifySyntaxTree(syntaxTree: SyntaxTree)
     }
     function stringifyTerminal(node: SyntaxTreeTerminalNode)
     {
-        return node.terminal.empty
+        return node.empty || node.terminal.empty
             ? "<>"
             : `"${node.token.attribute}"`;
     }
@@ -110,8 +110,7 @@ export class TopDownRecursiveAnalyser extends SyntaxAnalyser
         const current = tokens.current;
         const currentIdx = tokens.currentIdx;
         let node: SyntaxTreeNonTerminalNode = {
-            nonTerminal: nonTerminal,
-            production: null,
+            production: nonTerminal,
             children: []
         };
         for (let i = 0; i < nonTerminal.body.length; i++)
@@ -143,7 +142,7 @@ export class TopDownRecursiveAnalyser extends SyntaxAnalyser
             try
             {
                 const result = this.analyseNonTerminal(tokens, nonTerminals[i]);
-                result.production = production;
+                result.production = nonTerminals[i];
                 return result;
             }
             catch
@@ -187,24 +186,52 @@ export class LL1Analyser extends SyntaxAnalyser
     }
     analyse(tokens: LexToken[], entry?: string): SyntaxAnalyseResult
     {
-        if (this.syntax.productions.get(entry).productions.length > 1)
-            throw new Error("Entry production must be unique");
+        if (!entry)
+            entry = this.syntax.entry;
+        /*if (this.syntax.productions.get(entry).productions.length > 1)
+            throw new Error("Entry production must be unique");*/
         const reader = new TokenReader(tokens);
         return this.analyseInternal(reader, entry);
     }
     private analyseInternal(tokens: TokenReader, entry?: string): SyntaxAnalyseResult
     {
+        tokens.take();
+
         const stack: ProductionState[] = [{
             production: this.syntax.productions.get(entry).productions[0],
             idx: 0,
             node: <SyntaxTreeNonTerminalNode>{
-                nonTerminal: this.syntax.productions.get(entry).productions[0],
+                production: this.predictionTable.get(entry,tokens.current.name),
                 children:[]
             }
         }];
+        const result: SyntaxAnalyseResult = {
+            diagnostics: [],
+            syntaxTree: {
+                syntax: this.syntax,
+                root: null
+            }
+        };
+        const pop = (state:ProductionState) =>
+        {
+            const node = state.node;
+            stack.pop();
+            if (stack.length === 0)
+            {
+                result.syntaxTree.root = node;
+                return;
+            }
+            state = stack[stack.length - 1];
+            state.node.children.push(node);
+        }
+
         while (stack.length > 0)
         {
             let state = stack[stack.length - 1];
+            if (state.idx >= state.production.body.length)
+            {
+                pop(state);
+            }
             for (let i = state.idx; i < state.production.body.length; i++)
             {
                 const symbol = state.production.body[i];
@@ -212,8 +239,8 @@ export class LL1Analyser extends SyntaxAnalyser
                     state.node.children.push(<SyntaxTreeEmptyNode>{ empty: true });
                 else if (symbol.tokenName)
                 {
-                    if (tokens.next.name !== symbol.tokenName)
-                        throw new Error(`Unexpect token '${tokens.next}' in production ${stringifyProduction(state.production)}`);
+                    if (tokens.current.name !== symbol.tokenName)
+                        throw new Error(`Unexpect token '${tokens.current}' in production ${stringifyProduction(state.production)}`);
                     state.node.children.push(<SyntaxTreeTerminalNode>{
                         terminal: symbol,
                         token: tokens.take()
@@ -221,15 +248,15 @@ export class LL1Analyser extends SyntaxAnalyser
                 }
                 else if (symbol.productionName)
                 {
-                    const next = this.predictionTable.get(state.production.name, tokens.next.name);
+                    const next = this.predictionTable.get(symbol.productionName, tokens.current.name);
                     if (!next)
-                        throw new Error(`Unexpect token '${tokens.next}' in production ${stringifyProduction(state.production)}`);
+                        throw new Error(`Unexpect token '${tokens.current}' in production ${stringifyProduction(state.production)}`);
                     state.idx = i + 1;
                     stack.push({
                         idx: 0,
                         node: <SyntaxTreeNonTerminalNode>{
                             children: [],
-                            nonTerminal: next
+                            production: next
                         },
                         production: next
                     });
@@ -240,22 +267,12 @@ export class LL1Analyser extends SyntaxAnalyser
                 
                 if (i === state.production.body.length - 1)
                 {
-                    const node = state.node;
-                    stack.pop();
-                    if (stack.length === 0)
-                        return {
-                            syntaxTree: {
-                                root: <SyntaxTreeNonTerminalNode>node,
-                                syntax: this.syntax
-                            },
-                            diagnostics: []
-                        };
-                    state = stack[stack.length - 1];
-                    state.node.children.push(node);
+                    pop(state);
                     break;
                 }
             }
         }
+        return result;
     }
 }
 /*

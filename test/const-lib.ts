@@ -1,4 +1,5 @@
 import { SyntaxDef } from "../src/syntax-def";
+import { Language, simpleLexPattern } from "../src/lexer";
 
 export const SyntaxDefCLike: SyntaxDef = {
     "syntax": "<extern-statement-sequence>",
@@ -140,4 +141,65 @@ export const SyntaxDefCLikeNoAmbiguous: SyntaxDef = {
     "func-call-param": "<expr>",
     "prefix": "'++' | '--' | '-' | '~' | '*' | '&' | '!' | 'type-cast'",
     "postfix": "'++' | '--' | '[' <expr> ']' | '.' 'id' | '->'"
+};
+
+export const LanguageStatement: Language = {
+    comment: /(\/\/.*[\r]?[\n]?)|((?:\/\*(?!\/)(?:.|\s)*?\*\/))/,
+    whiteSpace: /\s+/,
+    patterns: [
+        ...simpleLexPattern([
+            "&&",
+            "||",
+            "++",
+            "--",
+            "+=",
+            "-=",
+            "*=",
+            "/=",
+            "&=",
+            "^=",
+            "|=",
+            "<=",
+            ">=",
+            "<<=",
+            ">>=",
+            "<<",
+            ">>"
+        ]),
+        ...simpleLexPattern("!~+-*/%=&|^<>(){}?:;,.".split("")),
+        ...simpleLexPattern([
+            "void",
+            "char",
+            "short",
+            "long long",
+            "long",
+            "float",
+            "double",
+            "int",
+            "if",
+            "else if",
+            "else",
+            "for",
+            "while",
+            "do",
+            "return",
+            "break",
+            "continue",
+            "switch",
+            "case",
+            "default",
+        ]),
+        {
+            id: "number",
+            pattern: /((\d)+)((\.((\d)+))?)((e(\+|-)?((\d)+))?)/
+        },
+        {
+            id: "id",
+            pattern: /[a-zA-Z_][a-zA-Z0-9]*/
+        },
+        {
+            id: "string",
+            pattern: /"([^\\"]|\\\S|\\")*"/
+        },
+    ]
 };
