@@ -1,6 +1,7 @@
 import { SyntaxDef, compileSyntax, preventLeftRecursive, removeLeftFactor } from "../src/syntax-def";
 import { expect } from "chai";
 import { generatePredictionMap, LL1Analyser, followSet, firstSet } from "../src/syntax-analyser";
+import { SyntaxDefAmbiguous } from "./const-lib";
 
 describe("LL(1) Analyser Test", () =>
 {
@@ -55,12 +56,7 @@ describe("LL(1) Analyser Test", () =>
 
         it("Ambiguous syntax", async () =>
         {
-            const syntaxDef: SyntaxDef = {
-                "statement": "'if' <expr> 'then' <statement> <statement-1> | 'other'",
-                "statement-1": "'else' <statement> | <>",
-                "expr": "'expr'"
-            };
-            const syntax = compileSyntax(syntaxDef, "statement");
+            const syntax = compileSyntax(SyntaxDefAmbiguous, "statement");
             const analyser = new LL1Analyser(syntax);
             const expectResult = {
                 'statement':
