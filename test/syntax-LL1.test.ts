@@ -19,8 +19,38 @@ describe("LL(1) Analyser Test", () =>
             //console.log(syntax.toString());
             //console.log(firstSet({ productionName: "expr-1" }, syntax));
             //console.log(followSet("term", syntax));
+            const expectResult = {
+                'expr':
+                {
+                    'id': '<expr>::=<term> <expr-1>',
+                    '(': '<expr>::=<term> <expr-1>'
+                },
+                'term':
+                {
+                    'id': '<term>::=<factor> <term-1>',
+                    '(': '<term>::=<factor> <term-1>'
+                },
+                'factor':
+                {
+                    'id': '<factor>::=\'id\'',
+                    '(': '<factor>::=\'(\' <expr> \')\''
+                },
+                'expr-1':
+                {
+                    '+': '<expr-1>::=\'+\' <term> <expr-1>',
+                    '$': '<expr-1>::=\'\'',
+                    ')': '<expr-1>::=\'\''
+                },
+                'term-1':
+                {
+                    '*': '<term-1>::=\'*\' <factor> <term-1>',
+                    '+': '<term-1>::=\'\'',
+                    '$': '<term-1>::=\'\'',
+                    ')': '<term-1>::=\'\''
+                }
+            };
             const analyser = new LL1Analyser(syntax);
-            //console.log(analyser.predictionTable.toString());
+            expect(analyser.predictionTable.objectify()).deep.equal(expectResult);
         });
 
         it("Ambiguous syntax", async () =>
@@ -32,7 +62,23 @@ describe("LL(1) Analyser Test", () =>
             };
             const syntax = compileSyntax(syntaxDef, "statement");
             const analyser = new LL1Analyser(syntax);
-            console.log(analyser.predictionTable.toString());
+            const expectResult = {
+                'statement':
+                {
+                    'if':
+                        '<statement>::=\'if\' <expr> \'then\' <statement> <statement-1>',
+                    'other': '<statement>::=\'other\''
+                },
+                'statement-1':
+                {
+                    'else': '<statement-1>::=\'else\' <statement>',
+                    '$': '<statement-1>::=\'\''
+                },
+                'expr': { 'expr': '<expr>::=\'expr\'' }
+            };
+            expect(analyser.predictionTable.objectify())
+                .be.deep.equal(expectResult);
+            
         });
     });
 });

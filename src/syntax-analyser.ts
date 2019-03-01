@@ -433,14 +433,25 @@ export class PredictionTable
     }
     toString(): string
     {
-        return `{\r\n${Object.keys(this.table).map(k1 => `    ${k1}: {\r\n${
+        return `{\r\n${Object.keys(this.table).map(k1 => `    "${k1}": {\r\n${
             Object.keys(this.table[k1]).map(
-                k2 => `        ${k2}: <${this.table[k1][k2].name}>::=${this.table[k1][k2].body.map(
+                k2 => `        "${k2}": "<${this.table[k1][k2].name}>::=${this.table[k1][k2].body.map(
                     unit => unit.empty
-                        ? '""'
+                        ? "''"
                         : unit.productionName
                             ? `<${unit.productionName}>`
-                            : `"${unit.tokenName}"`).join(" ")}`).join(", \r\n")}}`).join("}, \r\n")}\r\n}`;
+                            : `'${unit.tokenName}'`).join(" ")}"`).join(", \r\n")}}`).join(", \r\n")}\r\n}`;
+    }
+    objectify(): { [key: string]: { [key: string]: string } }
+    {
+        return JSON.parse(`{\r\n${Object.keys(this.table).map(k1 => `    "${k1}": {\r\n${
+            Object.keys(this.table[k1]).map(
+                k2 => `        "${k2}": "<${this.table[k1][k2].name}>::=${this.table[k1][k2].body.map(
+                    unit => unit.empty
+                        ? "''"
+                        : unit.productionName
+                            ? `<${unit.productionName}>`
+                            : `'${unit.tokenName}'`).join(" ")}"`).join(", \r\n")}}`).join(", \r\n")}\r\n}`);
     }
 }
 export class PredictionMap
