@@ -65,6 +65,21 @@ export class Syntax
     entry: string;
     productions: Map<string, ProductionGroup> = new Map();
 
+    optimize()
+    {
+        return this.escapeLeftRecursion().extractLeftFactor();
+    }
+    escapeLeftRecursion()
+    {
+        preventLeftRecursive(this);
+        return this;
+    }
+    extractLeftFactor()
+    {
+        removeLeftFactor(this);
+        return this;
+    }
+
     toString()
     {
         return Array.from(this.productions.values()).map(

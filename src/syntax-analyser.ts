@@ -240,7 +240,7 @@ export class LL1Analyser extends SyntaxAnalyser
                 else if (symbol.tokenName)
                 {
                     if (tokens.current.name !== symbol.tokenName)
-                        throw new Error(`Unexpect token '${tokens.current}' in production ${stringifyProduction(state.production)}`);
+                        throw new Error(`Unexpect token '${tokens.current.name}' in production ${stringifyProduction(state.production)}, symbol '${terminalStringify(symbol)}'`);
                     state.node.children.push(<SyntaxTreeTerminalNode>{
                         terminal: symbol,
                         token: tokens.take()
@@ -250,7 +250,7 @@ export class LL1Analyser extends SyntaxAnalyser
                 {
                     const next = this.predictionTable.get(symbol.productionName, tokens.current.name);
                     if (!next)
-                        throw new Error(`Unexpect token '${tokens.current}' in production ${stringifyProduction(state.production)}`);
+                        throw new Error(`Unexpect token '${tokens.current.name}' in production '${stringifyProduction(state.production)}', symbol '${terminalStringify(symbol)}'`);
                     state.idx = i + 1;
                     stack.push({
                         idx: 0,
@@ -263,7 +263,7 @@ export class LL1Analyser extends SyntaxAnalyser
                     break;
                 }
                 else
-                    throw new Error(`Unexpect symbol in production ${stringifyProduction(state.production)}`);
+                    throw new Error(`Unexpect symbol '${terminalStringify(symbol)}' in production '${stringifyProduction(state.production)}'`);
                 
                 if (i === state.production.body.length - 1)
                 {

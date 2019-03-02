@@ -86,7 +86,7 @@ export const SyntaxDefCLikeNoAmbiguous: SyntaxDef = {
     "syntax": "<extern-statement-sequence>",
     "extern-statement-sequence": "<extern-statement> <extern-statement-sequence> | <extern-statement> | <>",
     "extern-statement": "<extern-declare>",
-    "extern-declare": "<signed-type> <name> <function-postfix> | <signed-type> <name> <var-list-postfix>",
+    "extern-declare": "<type-ptr> <name> <function-postfix> | <type-ptr> <name> <var-init> <var-list-postfix>",
     "function-postfix": "'(' <params> ')' <block>",
     "var-list-postfix": "',' <var-list> ';' | ';'",
     "var-def": "<type-ptr> <var-list>",
@@ -98,7 +98,7 @@ export const SyntaxDefCLikeNoAmbiguous: SyntaxDef = {
     "var-init": "'=' <expr> | <>",
     //"function-def": "<signed-type> <name> '(' <params> ')' <block>",
     "params": "<param> ',' <params> | <param> | <>",
-    "param": "<signed-type> <name>",
+    "param": "<type-ptr> <name>",
     "body": "<statement> <body> | <statement> | <>",
     "statement": "<if> | <for> | <while> | <do-while> | <switch> | <expr> ';' | <var-def> ';' | <return-statement> ';' | <break-statement> ';' | <continue-statement> ';'",
     "return-statement": "'return' <expr> | 'return'",
@@ -199,6 +199,72 @@ export const LanguageStatement: Language = {
         },
         {
             id: "string",
+            pattern: /"([^\\"]|\\\S|\\")*"/
+        },
+    ]
+};
+
+export const LanguageClike: Language = {
+    comment: /(\/\/.*[\r]?[\n]?)|((?:\/\*(?!\/)(?:.|\s)*?\*\/))/,
+    whiteSpace: /\s+/,
+    patterns: [
+        ...simpleLexPattern([
+            "&&",
+            "||",
+            "++",
+            "--",
+            "+=",
+            "-=",
+            "*=",
+            "/=",
+            "&=",
+            "^=",
+            "|=",
+            "<=",
+            ">=",
+            "<<=",
+            ">>=",
+            "<<",
+            ">>"
+        ]),
+        {
+            id: "type-cast",
+            pattern: /\((unsigned\s+)?(void|char|short|int|long long|long|float|double|char)\**\)/
+        },
+        ...simpleLexPattern("!~+-*/%=&|^<>(){}?:;,.".split("")),
+        ...simpleLexPattern([
+            "unsigned",
+            "void",
+            "char",
+            "short",
+            "int",
+            "long long",
+            "long",
+            "float",
+            "double",
+            "if",
+            "else if",
+            "else",
+            "for",
+            "while",
+            "do",
+            "return",
+            "break",
+            "continue",
+            "switch",
+            "case",
+            "default",
+        ]),
+        {
+            id: "const-number",
+            pattern: /((\d)+)((\.((\d)+))?)((e(\+|-)?((\d)+))?)/
+        },
+        {
+            id: "id",
+            pattern: /[a-zA-Z_][a-zA-Z0-9]*/
+        },
+        {
+            id: "const-string",
             pattern: /"([^\\"]|\\\S|\\")*"/
         },
     ]
